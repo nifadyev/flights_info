@@ -18,29 +18,24 @@ def main():
     argument_parser.add_argument(
         "-return_date", help="return flight date")  # , default="")
     args = argument_parser.parse_args()
-    print(args)
     # TODO: do this through exception
     # TODO: handle cases when there is no return flight
-    # TODO: try to create url through ternary operator
-    if args.return_date:
-        url = "https://apps.penguin.bg/fly/quote3.aspx?rt="\
+
+    url = f"https://apps.penguin.bg/fly/quote3.aspx?"\
+        f"{'rt=' if args.return_date else 'ow='}"\
         f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
-        f"&rtdate={args.return_date}&aptcode2={args.dest_city}"\
-        f"&paxcount={args.adults_children}&infcount="
-    else:
-        url = "https://apps.penguin.bg/fly/quote3.aspx?ow="\
-        f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
+        f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
         f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
     print(url)
-        
+
     if requests.get(url).status_code != 200:
         # TODO: add proper comment
         raise ValueError("add proper comment")
+    else:
+        print("Correct request")
 
     # TODO: add here main function call (or creating class object)
-# TODO: diff between one way and return flights: ow= and rt=
-# TODO: diff between one way and return flights: no rtdate and rtdate
-# https://apps.penguin.bg/fly/quote3.aspx?ow=&lang=en&depdate=26.06.2019&aptcode1=CPH&aptcode2=BOJ&paxcount=1&infcount=
-# https://apps.penguin.bg/fly/quote3.aspx?rt=&lang=en&depdate=26.06.2019&aptcode1=CPH&rtdate=03.07.2019&aptcode2=BOJ&paxcount=1&infcount=
+
+
 if __name__ == "__main__":
     main()
