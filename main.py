@@ -1,5 +1,6 @@
 import argparse
 import requests
+import src.script as source
 
 
 def main():
@@ -28,13 +29,15 @@ def main():
         f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
     print(url)
 
-    if requests.get(url).status_code != 200:
+    request = requests.get(url)
+    if request.status_code != 200:
         # TODO: add proper comment
         raise ValueError("add proper comment")
     else:
         print("Correct request")
 
     # TODO: add here main function call (or creating class object)
+    source.find_flight_info(request, args.return_date)
 
 
 if __name__ == "__main__":
