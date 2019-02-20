@@ -1,11 +1,10 @@
 import argparse
+import sys
 import requests
 import src.script as source
 
 
-def main():
-    """ """
-
+def parse_arguments(args):
     argument_parser = argparse.ArgumentParser()
     # TODO: add description of IATA codes
     # TODO: create dict with impossible flights combination (also includes the same from to city)
@@ -18,7 +17,13 @@ def main():
         "adults_children", help="Number of adults and children")  # , default="")
     argument_parser.add_argument(
         "-return_date", help="return flight date")  # , default="")
-    args = argument_parser.parse_args()
+
+    return argument_parser.parse_args(args)
+
+
+def main():
+    """ """
+    args = parse_arguments(sys.argv[1:])
     # TODO: do this through exception
     # TODO: handle cases when there is no return flight
 
@@ -36,8 +41,7 @@ def main():
     else:
         print("Correct request")
 
-    # TODO: add here main function call (or creating class object)
-    source.find_flight_info(request, args.return_date)
+    source.find_flight_info(request)
 
 
 if __name__ == "__main__":
