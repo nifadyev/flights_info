@@ -1,17 +1,57 @@
 import argparse
+import datetime
 import lxml.etree
+
+
+def check_arguments(args):
+    """ """
+    date = tuple(int(i) for i in args[2].split("."))
+    str_date = tuple(i for i in args[2].split("."))
+    now = datetime.datetime.now()
+
+    AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
+                        ("BOJ", "BLL"))
+    CITY_CODES = ("CPH", "BLL", "PDV", "BOJ", "SOF", "VAR")
+
+    # Check flight routes
+    if args[0] not in CITY_CODES:
+        raise ValueError(f"City code {args[0]} is not in the base")
+    elif args[1] not in CITY_CODES:
+        raise ValueError(f"City code {args[0]} is not in the base")
+    elif (args[0], args[1]) not in AVAILABLE_ROUTES:
+        raise ValueError(f"Flight route {args[0]}-{args[1]} is unavailable")
+    elif args[0] == args[1]:
+        raise ValueError(
+            "Departure city and destination city cannot be the same")
+
+    # Check date
+    # Date is already past
+    if str(now.date()) > "-".join(str_date[::-1]):
+        raise ValueError
+    # Invalid day, month or year
+    if date[0] < 1 or date[0] > 31 or date[1] < 1\
+            or date[1] > 12 or date[2] < 2019:
+        raise ValueError
+
+    if len(args) == 5:
+        return_date = tuple(i for i in args[4].split("."))
+        # Check return date
+        if str(now.date()) > "-".join(str_date[::-1]):
+            raise ValueError
+        elif "-".join(str_date[::-1]) >= "-".join(return_date[::-1]):
+            raise ValueError
+    # TODO: add check for equal dest_city and dep_city
 
 
 def parse_arguments(args):
     """ """
-    date = tuple(int(i) for i in args[2].split("."))
-    print(date)
-    # TODO: add check for current date (if this date is aready past)
-    if date[0] < 1 or date[0] > 31 or date[1] < 1\
-            or date[1] > 12 or date[2] < 2019:
-        # print("error")
-        raise argparse.ArgumentError(args[2], "wrong date")
-    # TODO: add check for equal dest_city and dep_city
+    # try:
+    #     check_arguments(args)
+    # except:
+
+    # else:
+    check_arguments(args)
+
     argument_parser = argparse.ArgumentParser()
     # TODO: add description of IATA codes
     # TODO: create dict with impossible flights combination
@@ -34,6 +74,15 @@ def parse_arguments(args):
 
 def create_url(args):
     """ """
+    # try:
+    #     return f"https://apps.penguin.bg/fly/quote3.aspx?"\
+    #             f"{'rt=' if args.return_date else 'ow='}"\
+    #             f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
+    #             f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
+    #             f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
+    # except:
+
+    # else:
     return f"https://apps.penguin.bg/fly/quote3.aspx?"\
         f"{'rt=' if args.return_date else 'ow='}"\
         f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
