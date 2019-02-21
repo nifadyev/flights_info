@@ -2,12 +2,15 @@ import argparse
 import datetime
 import lxml.etree
 
+# TODO: maybe divide this func to 4/5 separate ones
+# TODO: exclude from output extra cities and flights with extra dates
+# TODO: захардкодить доступные для полета даты  
 
 def check_arguments(args):
     """ """
     date = tuple(int(i) for i in args[2].split("."))
     str_date = tuple(i for i in args[2].split("."))
-    now = datetime.datetime.now()
+    current_date = str(datetime.datetime.now().date())
 
     AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
                         ("BOJ", "BLL"))
@@ -26,21 +29,25 @@ def check_arguments(args):
 
     # Check date
     # Date is already past
-    if str(now.date()) > "-".join(str_date[::-1]):
-        raise ValueError
+    if current_date > "-".join(str_date[::-1]):
+        raise ValueError("Flight date has past")
     # Invalid day, month or year
-    if date[0] < 1 or date[0] > 31 or date[1] < 1\
-            or date[1] > 12 or date[2] < 2019:
-        raise ValueError
+    elif date[0] < 1 or date[0] > 31:
+        raise ValueError("Invalid day")
+    elif date[1] < 1 or date[1] > 12:
+        raise ValueError("Invalid month")
+    elif date[2] < 2019:
+        raise ValueError("Invalid year")
 
+    # Return date is set
     if len(args) == 5:
         return_date = tuple(i for i in args[4].split("."))
         # Check return date
-        if str(now.date()) > "-".join(str_date[::-1]):
-            raise ValueError
+        # FIXME: probably unnecessary
+        if current_date > "-".join(return_date[::-1]):
+            raise ValueError("Return flight date is outdated")
         elif "-".join(str_date[::-1]) >= "-".join(return_date[::-1]):
-            raise ValueError
-    # TODO: add check for equal dest_city and dep_city
+            raise ValueError("Return date cannot be earlier than flight date")
 
 
 def parse_arguments(args):
@@ -48,8 +55,12 @@ def parse_arguments(args):
     # try:
     #     check_arguments(args)
     # except:
+    # except ValueError, e:
+    # raise ValueError(f"Flight route {args[0]}-{args[1]} is unavailable")
+    # then print that this flight is unavailable without request
 
     # else:
+    # TODO: maybe reimagine this func to accept already parsed by argparse args
     check_arguments(args)
 
     argument_parser = argparse.ArgumentParser()
@@ -74,30 +85,29 @@ def parse_arguments(args):
 
 def create_url(args):
     """ """
-    # try:
-    #     return f"https://apps.penguin.bg/fly/quote3.aspx?"\
-    #             f"{'rt=' if args.return_date else 'ow='}"\
-    #             f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
-    #             f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
-    #             f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
-    # except:
 
-    # else:
     return f"https://apps.penguin.bg/fly/quote3.aspx?"\
         f"{'rt=' if args.return_date else 'ow='}"\
         f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
         f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
         f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
 
+# TODO: def print_info()
 
-def find_flight_info(request):
+
+def find_flight_info(request, args):
     """ """
     tree = lxml.etree.HTML(request.text)  # Full html page code
     table = tree.xpath(
-        f"/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        f"/tr/td/table[@id='flywiz_tblQuotes']/tr")
-
+        "/html/body/form[@id='form1']/div/table[@id='flywiz']"
+        "/tr/td/table[@id='flywiz_tblQuotes']/tr")
+    if table[1][0].text == "No available flights found.":
+        # TODO: maybe need args to specify info
+        print(f"Sorry, there is no available flight for this date")
+        return
+    # TODO: add column with flight duration
     # Table header
+    print(f"\t\t\t\t\t{table[0][0].text}")
     print("{:<17} {:<10} {:<10} {:<20} {:<20} {:<13} {:<21}".format(
         table[1][1].text, table[1][2].text, table[1][3].text,
         table[1][4].text, table[1][5].text, "Price", "Additional information"))
@@ -112,9 +122,12 @@ def find_flight_info(request):
         # Remove empty string from output
         if len(table[row]) == 1:
             continue
-        # Remove return flight table header if there is one
-        # TODO: do not remove it cause this is another table for return flights
+        # Table header
         elif table[row][1].text == "Date":
+            print("\n\t\t\t\t\tComing back")
+            print("{:<17} {:<10} {:<10} {:<20} {:<20} {:<13} {:<21}".format(
+                table[1][1].text, table[1][2].text, table[1][3].text,
+                table[1][4].text, table[1][5].text, "Price", "Additional information"))
             continue
 
         # First and second columns contains radio button and style
