@@ -10,6 +10,22 @@ class TestProgram(unittest.TestCase):
     """ """
     # def test_run_main(self):
 
+    def test_check_all_unavailable_routes(self):
+        args = ["PDV", "BOJ", "26.06.2019", "1"]
+        AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
+                            ("BOJ", "BLL"))
+        CITY_CODES = ("CPH", "BLL", "PDV", "BOJ", "SOF", "VAR")
+
+        for dep_city, dest_city in itertools.permutations(CITY_CODES, r=2):
+            if (dep_city, dest_city) not in AVAILABLE_ROUTES:
+                with self.subTest((dep_city, dest_city)):
+                    with self.assertRaises(ValueError) as e:
+                        source.parse_arguments(
+                            [f"{dep_city}", f"{dest_city}", "26.06.2019", "1"])
+                    self.assertEqual(
+                        e.exception.args[0], f"Flight route {dep_city}-{dest_city} is unavailable")
+
+
     def test_parse_arguments(self):
         """ """
         args = argparse.Namespace(adults_children='1', dep_city='CPH',
@@ -24,7 +40,8 @@ class TestProgram(unittest.TestCase):
             source.parse_arguments(["CPH", "PDV", "26.06.2019", "1"])
 
         # e.exception.args[0] contains error message
-        self.assertEqual(e.exception.args[0], "Flight route CPH-PDV is unavailable")
+        self.assertEqual(e.exception.args[0],
+                         "Flight route CPH-PDV is unavailable")
 
     def test_run_test(self):
         try:
