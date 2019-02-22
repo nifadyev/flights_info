@@ -3,7 +3,6 @@ import datetime
 import lxml.etree
 
 # TODO: maybe divide this func to 4/5 separate ones
-# TODO: exclude from output extra cities and flights with extra dates
 # TODO: захардкодить доступные для полета даты
 # TODO: decorate main func flight_info by check_args and create_url
 # TODO: output info if one of the args data or return date is invalid
@@ -19,7 +18,8 @@ def check_arguments(args):
     BOJ_TO_CPH_DATES = ("27.06.2019", "04.07.2019", "11.07.2019",
                         "18.07.2019", "25.07.2019", "01.08.2019", "08.08.2019")
     BOJ_TO_CPH_DATES_INVALID = ("26.06.2019", "03.07.2019", "10.07.2019",
-                        "17.07.2019", "24.07.2019", "31.07.2019", "07.08.2019")
+                                "17.07.2019", "24.07.2019", "31.07.2019",
+                                "07.08.2019")
     BOJ_TO_BLL_DATES = ("01.07.2019", "08.07.2019", "15.07.2019",
                         "22.07.2019", "29.07.2019", "05.08.2019")
 
@@ -110,110 +110,110 @@ def create_url(args):
 # TODO: def print_info()
 
 
+def calculate_flight_duration(departure_time, arrival_time):
+    """ """
+
+    parsed_departure_time = [int(i) for i in departure_time.split(":")]
+    parsed_arrival_time = [int(i) for i in arrival_time.split(":")]
+
+    minutes = parsed_arrival_time[1] - parsed_departure_time[1]
+    correct_minutes = (60 + minutes) if minutes < 0 else minutes
+    hours = parsed_arrival_time[0] - parsed_departure_time[0]
+    correct_hours = hours - 1 if minutes < 0 else hours
+
+    return (":".join([str(correct_hours) if correct_hours >= 10
+                      else "".join(["0", str(correct_hours)]),
+                      str(correct_minutes)] if correct_minutes >= 10
+                     else "".join(["0", str(correct_minutes)])))
+
+
+def parse_flight_date(date):
+    parsed_date = list()
+    # FIXME: do i really need unformat_date?!
+    unformat_date = date
+    for item in unformat_date[5:].split(" "):
+        if item == "Jun":
+            parsed_date.append("06")
+        elif item == "Jul":
+            parsed_date.append("07")
+        elif item == "Aug":
+            parsed_date.append("08")
+        elif item == "19":
+            parsed_date.append("2019")
+        else:
+            parsed_date.append(
+                "".join(["0", item]) if len(item) == 1 else item)
+
+    return parsed_date
+
+
 def find_flight_info(request, args):
     """ """
     tree = lxml.etree.HTML(request.text)  # Full html page code
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
+
+    # TODO: maybe this if is extra
     if table[1][0].text == "No available flights found.":
         # TODO: maybe need args to specify info
         print(f"Sorry, there is no available flight for this date")
         return
-    # TODO: add column with flight duration
+
     # Table header
-    # TODO: move Going out and Coming back to the left => change string format
-    print(f"\t\t\t\t\t{table[0][0].text}")
-    print("{:<17} {:<10} {:<10} {:<20} {:<20} {:<13} {:<21}".format(
+    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}".format(
+        "Direction",
         table[1][1].text, table[1][2].text, table[1][3].text,
+        "Flight duration",
         table[1][4].text, table[1][5].text, "Price", "Additional information"))
     # Price is displayed per person
     # TODO: maybe change price to total cost or just remove adults arg
-
-    # TODO: if data is not available then request will return closest flight
     # First and second table rows contains table name and names of columns
     for row in range(2, len(table)):
-        if len(table[row]) == 1 or len(table[row]) == 2 or len(table[row]) == 3 or table[row][1].text == "Date":
+        # Empty row, with price, with price and additional info or with table2 header or with table2 name
+        if len(table[row]) == 1 or len(table[row]) == 2\
+                or len(table[row]) == 3 or table[row][1].text == "Date":
             continue
-            
-        flight_date = list()
-        unformat_date = table[row][1].text
-        for item in unformat_date[5:].split(" "):
-            if item == "Jun":
-                flight_date.append("06")
-            elif item == "Jul":
-                flight_date.append("07")
-            elif item == "Aug":
-                flight_date.append("08")
-            elif item == "19":
-                flight_date.append("2019")
-            else:
-                flight_date.append("".join(["0", item]) if len(item) == 1 else item)
-        # print(".".join(flight_date))
-        if ".".join(flight_date) == args.return_date:
-            print("Alright")
 
-        current_row = list()
-        # if ".".join(flight_date) == args.dep_date and args.dep_city in table[row][4].text and args.dest_city in table[row][5]:
-        #     print price and additional info here
-        #     if len(table[row+1]) == 1:
-        #         only price
-        #     elif len(table[row+ 1]) == 2:
-        #         price + additional info
-        #     OK
-        # elif table[row][1].text == args.return_date and args.dest_city in table[row][4].text and args.dep_city in table[row][5]:
-        #     OK
-        if ".".join(flight_date) == args.dep_date and args.dep_city in table[row][4].text and args.dest_city in table[row][5].text:
-            print("{:<17} {:<10} {:<10} {:<20} {:<21}".format(
+        flight_date = parse_flight_date(table[row][1].text)
+
+        # Search for going out flight
+        if ".".join(flight_date) == args.dep_date\
+                and args.dep_city in table[row][4].text\
+                and args.dest_city in table[row][5].text:
+            print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<21}".format(
+                "Going out",
                 table[row][1].text, table[row][2].text, table[row][3].text,
+                calculate_flight_duration(
+                    table[row][2].text, table[row][3].text),
                 table[row][4].text, table[row][5].text), end="")
+
+            # First and second columns contains radio button and style
+            # Row + 1 contains only price
             if len(table[row+1]) == 3:
-                # print("HRERE")
+                unformatted_price = table[row+1][1].text
+                print("{:<13}".format(unformatted_price[8:]))
+            # Row + 1 also contains additional information
+            elif len(table[row+1]) == 4:
+                unformatted_price = table[row+1][1].text
+                print("{:<13} {:<20}".format(
+                    unformatted_price[8:], table[row+1][2].text))
+
+        # Search for coming back flight
+        elif ".".join(flight_date) == args.return_date\
+                and args.dest_city in table[row][4].text\
+                and args.dep_city in table[row][5].text:
+            print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<21}".format(
+                "Coming back",
+                table[row][1].text, table[row][2].text, table[row][3].text,
+                calculate_flight_duration(
+                    table[row][2].text, table[row][3].text),
+                table[row][4].text, table[row][5].text), end="")
+
+            if len(table[row+1]) == 3:
                 unformatted_price = table[row+1][1].text
                 print("{:<13}".format(unformatted_price[8:]))
             elif len(table[row+1]) == 4:
-                # print("HRsadERE")
                 unformatted_price = table[row+1][1].text
-                # print(table[row+1][2].text)
-                print("{:<13} {:<20}".format(unformatted_price[8:], table[row+1][2].text))
-        elif ".".join(flight_date) == args.return_date and args.dest_city in table[row][4].text and args.dep_city in table[row][5].text:
-            print("{:<17} {:<10} {:<10} {:<20} {:<21}".format(
-                table[row][1].text, table[row][2].text, table[row][3].text,
-                table[row][4].text, table[row][5].text), end="")
-            if len(table[row+1]) == 3:
-                # print("HRERE")
-                unformatted_price = table[row+1][1].text
-                print("{:<13}".format(unformatted_price[8:]))
-            elif len(table[row+1]) == 4:
-                # print("HRsadERE")
-                unformatted_price = table[row+1][1].text
-                # print(table[row+1][2].text)
-                print("{:<13} {:<20}".format(unformatted_price[8:], table[row+1][2].text))
-        # Remove empty string from output
-        # if len(table[row]) == 1:
-        #     continue
-        # # Table header
-        # elif table[row][1].text == "Date":
-        #     print("\n\t\t\t\t\tComing back")
-        #     # print("{:<17} {:<10} {:<10} {:<20} {:<20} {:<13} {:<21}".format(
-        #     #     table[1][1].text, table[1][2].text, table[1][3].text,
-        #     #     table[1][4].text, table[1][5].text, "Price",
-        #     #     "Additional information"))
-        #     continue
-
-        # # First and second columns contains radio button and style
-        # for column in range(1, len(table[row])):
-        #     if table[row][column].text:
-        #         current_row.append(table[row][column].text)
-
-        # if len(current_row) == 5:
-        #     print("{:<17} {:<10} {:<10} {:<20} {:<21}".format(
-        #         current_row[0], current_row[1], current_row[2],
-        #         current_row[3], current_row[4]), end="")
-
-        # # Row with price
-        # elif len(current_row) == 1:
-        #     print("{:<13}".format(current_row[0][8:]))
-        # # + additional information
-        # elif len(current_row) == 2:
-        #     print("{:<13} {:<20}".format(current_row[0][8:], current_row[1]))
+                print("{:<13} {:<20}".format(
+                    unformatted_price[8:], table[row+1][2].text))
