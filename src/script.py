@@ -1,9 +1,9 @@
 import argparse
 import datetime
 import lxml.etree
+import requests
 
 # TODO: maybe divide this func to 4/5 separate ones
-# TODO: захардкодить доступные для полета даты
 # TODO: decorate main func flight_info by check_args and create_url
 # TODO: output info if one of the args data or return date is invalid
 
@@ -43,6 +43,18 @@ def check_arguments(args):
             "Departure city and destination city cannot be the same")
 
     # Check date
+    if args[0] == "CPH" and args[1] == "BOJ":
+        if ".".join(str_date) not in CPH_TO_BOJ_DATES:
+            raise BaseException(f"No available flights from CPH to BOJ for date {'.'.join(str_date)}")
+    if args[0] == "BLL" and args[1] == "BOJ":
+        if ".".join(str_date) not in BLL_TO_BOJ_DATES:
+            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
+    if args[0] == "BLL" and args[1] == "CPH":
+        if ".".join(str_date) not in BLL_TO_CPH_DATES:
+            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
+    if args[0] == "BOJ" and args[1] == "BLL":
+        if ".".join(str_date) not in BOJ_TO_BLL_DATES:
+            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
     # Date is already past
     if current_date > "-".join(str_date[::-1]):
         raise ValueError("Flight date has past")
@@ -56,9 +68,23 @@ def check_arguments(args):
 
     # Return date is set
     if len(args) == 5:
-        return_date = tuple(i for i in args[4].split("."))
+        # args[4][:14] = "-return_date"
+        return_date = tuple(i for i in args[4][13:].split("."))
+        if args[0] == "CPH" and args[1] == "BOJ":
+            if ".".join(return_date) not in BOJ_TO_CPH_DATES:
+                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+        if args[0] == "BLL" and args[1] == "BOJ":
+            if ".".join(return_date) not in BOJ_TO_BLL_DATES:
+                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+        if args[0] == "BLL" and args[1] == "CPH":
+            if ".".join(return_date) not in CPH_TO_BLL_DATES:
+                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+        if args[0] == "BOJ" and args[1] == "BLL":
+            if ".".join(return_date) not in BLL_TO_BOJ_DATES:
+                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
         # Check return date
         # FIXME: probably unnecessary
+        # current date format: yyyy-mm-dd
         if current_date > "-".join(return_date[::-1]):
             raise ValueError("Return flight date is outdated")
         elif "-".join(str_date[::-1]) >= "-".join(return_date[::-1]):
@@ -77,11 +103,9 @@ def parse_arguments(args):
     # else:
     # TODO: maybe reimagine this func to accept already parsed by argparse args
     check_arguments(args)
-
-    argument_parser = argparse.ArgumentParser()
+    # TODO: Wright correct description
+    argument_parser = argparse.ArgumentParser(description="Flight informer")
     # TODO: add description of IATA codes
-    # TODO: create dict with impossible flights combination
-    # (also includes the same from to city)
     argument_parser.add_argument("dep_city",
                                  help="departure city IATA code",
                                  choices=["CPH", "BLL", "PDV", "BOJ",
@@ -130,8 +154,8 @@ def calculate_flight_duration(departure_time, arrival_time):
 def parse_flight_date(date):
     parsed_date = list()
     # FIXME: do i really need unformat_date?!
-    unformat_date = date
-    for item in unformat_date[5:].split(" "):
+    # unformat_date = date
+    for item in date[5:].split(" "):
         if item == "Jun":
             parsed_date.append("06")
         elif item == "Jul":
@@ -146,9 +170,14 @@ def parse_flight_date(date):
 
     return parsed_date
 
-
-def find_flight_info(request, args):
+# TODO: change first arg cause request costs too much of time
+def find_flight_info(args):
     """ """
+
+    request = requests.get(create_url(args))
+    if request.status_code != 200:
+        # TODO: add proper comment
+        raise ValueError("add proper comment")
     tree = lxml.etree.HTML(request.text)  # Full html page code
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
