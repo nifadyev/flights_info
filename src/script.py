@@ -8,8 +8,9 @@ import requests
 # TODO: output info if one of the args data or return date is invalid
 
 
-def check_arguments(args):
+def check_date(dep_date, return_date, args):
     """ """
+
     CPH_TO_BOJ_DATES = ("26.06.2019", "03.07.2019", "10.07.2019",
                         "17.07.2019", "24.07.2019", "31.07.2019", "07.08.2019")
     BLL_TO_BOJ_DATES = ("01.07.2019", "08.07.2019", "15.07.2019",
@@ -27,34 +28,23 @@ def check_arguments(args):
     str_date = tuple(i for i in args[2].split("."))
     current_date = str(datetime.datetime.now().date())
 
-    AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
-                        ("BOJ", "BLL"))
-    CITY_CODES = ("CPH", "BLL", "PDV", "BOJ", "SOF", "VAR")
-
-    # Check flight routes
-    if args[0] not in CITY_CODES:
-        raise ValueError(f"City code {args[0]} is not in the base")
-    elif args[1] not in CITY_CODES:
-        raise ValueError(f"City code {args[0]} is not in the base")
-    elif (args[0], args[1]) not in AVAILABLE_ROUTES:
-        raise ValueError(f"Flight route {args[0]}-{args[1]} is unavailable")
-    elif args[0] == args[1]:
-        raise ValueError(
-            "Departure city and destination city cannot be the same")
-
     # Check date
     if args[0] == "CPH" and args[1] == "BOJ":
         if ".".join(str_date) not in CPH_TO_BOJ_DATES:
-            raise BaseException(f"No available flights from CPH to BOJ for date {'.'.join(str_date)}")
+            raise BaseException(
+                f"No available flights from CPH to BOJ for date {'.'.join(str_date)}")
     if args[0] == "BLL" and args[1] == "BOJ":
         if ".".join(str_date) not in BLL_TO_BOJ_DATES:
-            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
+            raise BaseException(
+                f"No available flights for date {'.'.join(str_date)}")
     if args[0] == "BLL" and args[1] == "CPH":
         if ".".join(str_date) not in BLL_TO_CPH_DATES:
-            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
+            raise BaseException(
+                f"No available flights for date {'.'.join(str_date)}")
     if args[0] == "BOJ" and args[1] == "BLL":
         if ".".join(str_date) not in BOJ_TO_BLL_DATES:
-            raise BaseException(f"No available flights for date {'.'.join(str_date)}")
+            raise BaseException(
+                f"No available flights for date {'.'.join(str_date)}")
     # Date is already past
     if current_date > "-".join(str_date[::-1]):
         raise ValueError("Flight date has past")
@@ -72,16 +62,20 @@ def check_arguments(args):
         return_date = tuple(i for i in args[4][13:].split("."))
         if args[0] == "CPH" and args[1] == "BOJ":
             if ".".join(return_date) not in BOJ_TO_CPH_DATES:
-                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+                raise BaseException(
+                    f"No available return flights for date {'.'.join(return_date)}")
         if args[0] == "BLL" and args[1] == "BOJ":
             if ".".join(return_date) not in BOJ_TO_BLL_DATES:
-                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+                raise BaseException(
+                    f"No available return flights for date {'.'.join(return_date)}")
         if args[0] == "BLL" and args[1] == "CPH":
             if ".".join(return_date) not in CPH_TO_BLL_DATES:
-                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+                raise BaseException(
+                    f"No available return flights for date {'.'.join(return_date)}")
         if args[0] == "BOJ" and args[1] == "BLL":
             if ".".join(return_date) not in BLL_TO_BOJ_DATES:
-                raise BaseException(f"No available return flights for date {'.'.join(return_date)}")
+                raise BaseException(
+                    f"No available return flights for date {'.'.join(return_date)}")
         # Check return date
         # FIXME: probably unnecessary
         # current date format: yyyy-mm-dd
@@ -91,16 +85,42 @@ def check_arguments(args):
             raise ValueError("Return date cannot be earlier than flight date")
 
 
+def check_routes(dep_city, dest_city):
+    """ """
+
+    AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
+                        ("BOJ", "BLL"))
+    if (dep_city, dest_city) not in AVAILABLE_ROUTES:
+        raise ValueError(f"Flight route {dep_city}-{dest_city} is unavailable")
+    elif dep_city == dest_city:
+        raise ValueError(
+            "Departure city and destination city cannot be the same")
+
+
+# FIXME: maybe unnecessary
+def check_city_codes(dep_city, dest_city):
+    """ """
+
+    CITY_CODES = ("CPH", "BLL", "PDV", "BOJ", "SOF", "VAR")
+
+    # Check flight routes
+    if dep_city not in CITY_CODES:
+        raise ValueError(f"City code {dep_city} is not in the base")
+    elif dest_city not in CITY_CODES:
+        raise ValueError(f"City code {dest_city} is not in the base")
+
+
+def check_arguments(args):
+    """ """
+
+    check_date(args[2], args[4], args)
+    check_routes(args[0], args[1])
+    check_city_codes(args[0], args[1])
+
+
 def parse_arguments(args):
     """ """
-    # try:
-    #     check_arguments(args)
-    # except:
-    # except ValueError, e:
-    # raise ValueError(f"Flight route {args[0]}-{args[1]} is unavailable")
-    # then print that this flight is unavailable without request
 
-    # else:
     # TODO: maybe reimagine this func to accept already parsed by argparse args
     check_arguments(args)
     # TODO: Wright correct description
@@ -170,7 +190,7 @@ def parse_flight_date(date):
 
     return parsed_date
 
-# TODO: change first arg cause request costs too much of time
+
 def find_flight_info(args):
     """ """
 
