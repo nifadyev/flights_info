@@ -20,19 +20,16 @@ def validate_date(dep_date, return_date):
 
     # yyyy-mm-dd
     if len(formatted_date) != 10:
-        raise ValueError("Invalid date format")
+        raise ValueError("Invalid departure date format")
+
+    # Invalid day, month or year
+    if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
+            or date[2] != 2019:
+        raise ValueError("Invalid departure date format")
 
     # Date is already past
     if current_date > formatted_date:
-        raise ValueError("Flight date has past")
-
-    # Invalid day, month or year
-    if date[0] < 1 or date[0] > 31:
-        raise ValueError("Invalid day")
-    elif date[1] < 1 or date[1] > 12:
-        raise ValueError("Invalid month")
-    elif date[2] != 2019:
-        raise ValueError("Invalid year")
+        raise ValueError("Old departure date")
 
     # Check return date
     if return_date:
@@ -40,25 +37,22 @@ def validate_date(dep_date, return_date):
         str_ret_date = tuple(i for i in return_date.split("."))
         formatted_ret_date = "-".join(str_ret_date[::-1])
 
-        if len(formatted_date) != 10:
-            raise ValueError("Invalid date format")
-
         # Invalid day, month or year
-        if ret_date[0] < 1 or ret_date[0] > 31:
-            raise ValueError("Invalid day")
-        elif ret_date[1] < 1 or ret_date[1] > 12:
-            raise ValueError("Invalid month")
-        elif ret_date[2] != 2019:
-            raise ValueError("Invalid year")
+        if ret_date[0] < 1 or ret_date[0] > 31 or ret_date[1] < 1\
+                or ret_date[1] > 12 or ret_date[2] != 2019\
+                or len(formatted_date) != 10:
+            raise ValueError("Invalid return date format")
 
+        # Old return date
         if current_date > formatted_ret_date:
-            raise ValueError("Return flight date is outdated")
+            raise ValueError("Old return date")
+        # Departure date is older than return date
         elif formatted_date >= formatted_ret_date:
-            raise ValueError("Return date cannot be earlier than flight date")
+            raise ValueError("Departure date is older than return date")
 
 
-def check_date_availability(args):
-    """Check flight availability for current departure date and return date."""
+def check_date_availability(args, is_return_flight):
+    """Check flight availability for specified date."""
 
     # Available flight dates for each possible route
     CPH_TO_BOJ_DATES = ("26.06.2019", "03.07.2019", "10.07.2019",
@@ -72,45 +66,27 @@ def check_date_availability(args):
     BLL_TO_BOJ_DATES = ("01.07.2019", "08.07.2019", "15.07.2019",
                         "22.07.2019", "29.07.2019", "05.08.2019")
 
-    # TODO: later make a func out of it to decrease code size and duplicity
-    # Check going out routes
-    if args.dep_city == "CPH" and args.dest_city == "BOJ":
-        if args.dep_date not in CPH_TO_BOJ_DATES:
-            raise BaseException(
-                f"No available flights from CPH to BOJ for date\
-                 {args.dep_date}")
-    if args.dep_city == "BLL" and args.dest_city == "BOJ":
-        if args.dep_date not in BLL_TO_BOJ_DATES:
-            raise BaseException(
-                f"No available flights for date {args.dep_date}")
-    if args.dep_city == "BOJ" and args.dest_city == "CPH":
-        if args.dep_date not in BOJ_TO_CPH_DATES:
-            raise BaseException(
-                f"No available flights for date {args.dep_date}")
-    if args.dep_city == "BOJ" and args.dest_city == "BLL":
-        if args.dep_date not in BOJ_TO_BLL_DATES:
-            raise BaseException(
-                f"No available flights for date {args.dep_date}")
+    departure_city = args.dest_city if is_return_flight else args.dep_city
+    destination_city = args.dep_city if is_return_flight else args.dest_city
+    date = args.return_date if is_return_flight else args.dep_date
 
-    # Check coming back routes
-    if args.return_date:
-        if args.dep_city == "CPH" and args.dest_city == "BOJ":
-            if args.return_date not in BOJ_TO_CPH_DATES:
-                raise BaseException(
-                    f"No available return flights for date\
-                     {args.return_date}")
-        if args.dep_city == "BLL" and args.dest_city == "BOJ":
-            if args.return_date not in BOJ_TO_BLL_DATES:
-                raise BaseException(
-                    f"No available return flights for date {args.return_date}")
-        if args.dep_city == "BOJ" and args.dest_city == "CPH":
-            if args.return_date not in CPH_TO_BOJ_DATES:
-                raise BaseException(
-                    f"No available return flights for date {args.return_date}")
-        if args.dep_city == "BOJ" and args.dest_city == "BLL":
-            if args.return_date not in BLL_TO_BOJ_DATES:
-                raise BaseException(
-                    f"No available return flights for date {args.return_date}")
+    # Check routes
+    if departure_city == "CPH" and destination_city == "BOJ":
+        if date not in CPH_TO_BOJ_DATES:
+            raise ValueError(
+                f"No available flights from CPH to BOJ for date {date}")
+    if departure_city == "BLL" and destination_city == "BOJ":
+        if date not in BLL_TO_BOJ_DATES:
+            raise ValueError(
+                f"No available flights for date {date}")
+    if departure_city == "BOJ" and destination_city == "CPH":
+        if date not in BOJ_TO_CPH_DATES:
+            raise ValueError(
+                f"No available flights for date {date}")
+    if departure_city == "BOJ" and destination_city == "BLL":
+        if date not in BOJ_TO_BLL_DATES:
+            raise ValueError(
+                f"No available flights for date {date}")
 
 
 def check_route(dep_city, dest_city):
@@ -128,7 +104,7 @@ def check_route(dep_city, dest_city):
 
 
 def parse_arguments(args):
-    """Parse command line arguments using aprgparse.
+    """Parse command line arguments using argparse.
     Contains help message.
     """
 
@@ -159,13 +135,10 @@ def create_url(args):
         f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
         f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
 
-# TODO: def print_info()
-
 
 def calculate_flight_duration(departure_time, arrival_time):
-    """Calculate flight dureatiom in format hh:mm."""
+    """Calculate flight duration in format hh:mm."""
 
-    # FIXME: invalid value for return flight BOJ BLL
     parsed_departure_time = [int(i) for i in departure_time.split(":")]
     parsed_arrival_time = [int(i) for i in arrival_time.split(":")]
 
@@ -176,8 +149,8 @@ def calculate_flight_duration(departure_time, arrival_time):
 
     return (":".join([str(correct_hours) if correct_hours >= 10
                       else "".join(["0", str(correct_hours)]),
-                      str(correct_minutes)] if correct_minutes >= 10
-                     else "".join(["0", str(correct_minutes)])))
+                      str(correct_minutes) if correct_minutes >= 10
+                      else "".join(["0", str(correct_minutes)])]))
 
 
 def parse_flight_date(date):
@@ -201,6 +174,8 @@ def parse_flight_date(date):
 
     return ".".join(parsed_date)
 
+# TODO: def print_info()
+
 
 def find_flight_info(arguments):
     """Main function."""
@@ -211,19 +186,33 @@ def find_flight_info(arguments):
         args = parse_arguments(arguments)
     except SystemExit:
         raise SystemExit(
-            "Please choose IATA city codes from suggested above list")
+            "Please choose IATA city codes from suggested list: "
+            + "CPH, BLL, PDV, BOJ, SOF, VAR")
 
     try:
         validate_date(
             args.dep_date, args.return_date if args.return_date else None)
     except ValueError as value_error:
-        raise SystemExit("Invalid date", args.dep_date)
+        if value_error.args[0] == "Invalid departure date format":
+            raise SystemExit("Invalid departure date format. Please make sure that date follow this format: dd.mm.yyyy")
+        elif value_error.args[0] == "Old departure date":
+            raise SystemExit("Departure date is outdated. Please change it to actual date")
+        elif value_error.args[0] == "Invalid return date format":    
+            raise SystemExit("Invalid return date format. Please make sure that date follow this format: dd.mm.yyyy")
+        elif value_error.args[0] == "Old return date":
+            raise SystemExit("Return date is outdated. Please change it to actual date")
+        elif value_error.args[0] == "Departure date is older than return date":
+            raise SystemExit("Departure date is older than return date")
 
     try:
-        check_date_availability(args)
+        check_date_availability(args, False)
+        if len(arguments) == 5:
+            check_date_availability(args, True)
     except ValueError as value_error:
-        raise SystemExit("Unchecked date")
-        # Check route for availability
+        raise SystemExit(
+            "No available flights for specified dates. Please choose date from ")
+
+    # Check route for availability
     try:
         check_route(args.dep_city, args.dest_city)
     except ValueError as value_error:
@@ -246,11 +235,9 @@ def find_flight_info(arguments):
 
     # Table header
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
-        ".format(
-        "Direction",
-        table[1][1].text, table[1][2].text, table[1][3].text,
-        "Flight duration",
-        table[1][4].text, table[1][5].text, "Price", "Additional information"))
+        ".format("Direction", table[1][1].text, table[1][2].text,
+                 table[1][3].text, "Flight duration", table[1][4].text,
+                 table[1][5].text, "Price", "Additional information"))
     # Price is displayed per person
     # TODO: maybe change price to total cost or just remove adults arg
     # First and second table rows contains table name and names of columns
