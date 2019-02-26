@@ -12,17 +12,35 @@ class TestProgram(unittest.TestCase):
         try:
             source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"])
         except ValueError:
-            self.fail("myFunc() raised ExceptionType unexpectedly!")
+            self.fail("parse_arguments raised ValueError unexpectedly!")
 
-    def test_validate_date_too_input_arg(self):
+    def test_validate_date_too_long_date(self):
         with self.assertRaises(ValueError) as value_error:
             source.validate_date("23.01.20191")
             self.assertEqual(
                 value_error.exception.args[0], "Invalid date format")
 
-    def test_validate_date_too_short_arg(self):
+    def test_validate_date_too_short_date(self):
         with self.assertRaises(ValueError) as value_error:
             source.validate_date("3.11.2019")
+            self.assertEqual(
+                value_error.exception.args[0], "Invalid date format")
+
+    def test_validate_date_invalid_date_format(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("03-04-2019")
+            self.assertEqual(
+                value_error.exception.args[0], "Invalid date format")
+
+    def test_validate_date_invalid_date_structure(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("2019.01.24")
+            self.assertEqual(
+                value_error.exception.args[0], "Invalid date format")
+
+    def test_validate_date_invalid_type(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("abcd")
             self.assertEqual(
                 value_error.exception.args[0], "Invalid date format")
 
@@ -32,9 +50,21 @@ class TestProgram(unittest.TestCase):
             self.assertEqual(
                 value_error.exception.args[0], "Invalid date format")
 
+    def test_validate_date_negative_day(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("-12.10.2019")
+            self.assertEqual(
+                value_error.exception.args[0], "Invalid date format")
+
     def test_validate_date_invalid_month(self):
         with self.assertRaises(ValueError) as value_error:
             source.validate_date("14.o8.2019")
+            self.assertEqual(
+                value_error.exception.args[0], "Invalid date format")
+
+    def test_validate_date_negative_month(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("14.-12.2019")
             self.assertEqual(
                 value_error.exception.args[0], "Invalid date format")
 
@@ -43,6 +73,12 @@ class TestProgram(unittest.TestCase):
             source.validate_date("31.12.2020")
             self.assertEqual(
                 value_error.exception.args[0], "Invalid date format")
+
+    def test_validate_date_old_date(self):
+        with self.assertRaises(ValueError) as value_error:
+            source.validate_date("25.02.2019")
+            self.assertEqual(
+                value_error.exception.args[0], "Old date")
 
     def test_check_all_unavailable_routes(self):
         # args = ["PDV", "BOJ", "26.06.2019", "1"]
