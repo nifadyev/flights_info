@@ -18,12 +18,7 @@ def validate_date(flight_date):
 
     # yyyy-mm-dd
     if len(formatted_date) != 10:
-        raise ValueError("Invalid departure date format")
-
-    # Invalid day, month or year
-    if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
-            or date[2] != 2019:
-        raise ValueError("Invalid departure date format")
+        raise ValueError("Invalid date format")
 
     # Invalid day, month or year
     if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
@@ -33,7 +28,6 @@ def validate_date(flight_date):
     # Date is already past
     if current_date > formatted_date:
         raise ValueError("Old date")
-
 
 
 def check_date_availability(args, is_return_flight):
