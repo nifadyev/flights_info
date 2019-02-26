@@ -29,42 +29,28 @@ def validate_date(flight_date):
     if current_date > formatted_date:
         raise ValueError("Old date")
 
-    #     # Departure date is older than return date
-    #     elif formatted_date >= formatted_ret_date:
-    #         raise ValueError("Departure date is older than return date")
-
 
 def check_date_availability(args, is_return_flight):
     """Check flight availability for specified date."""
 
     # Available flight dates for each possible route
-    CPH_TO_BOJ_DATES = ("26.06.2019", "03.07.2019", "10.07.2019",
-                        "17.07.2019", "24.07.2019", "31.07.2019",
-                        "07.08.2019")
-    BOJ_TO_CPH_DATES = ("27.06.2019", "04.07.2019", "11.07.2019",
-                        "18.07.2019", "25.07.2019", "01.08.2019",
-                        "08.08.2019")
-    BOJ_TO_BLL_DATES = ("01.07.2019", "08.07.2019", "15.07.2019",
-                        "22.07.2019", "29.07.2019", "05.08.2019")
-    BLL_TO_BOJ_DATES = ("01.07.2019", "08.07.2019", "15.07.2019",
-                        "22.07.2019", "29.07.2019", "05.08.2019")
+    DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
+                              "17.07.2019", "24.07.2019", "31.07.2019",
+                              "07.08.2019"},
+             ("BOJ", "CPH"): {"27.06.2019", "04.07.2019", "11.07.2019",
+                              "18.07.2019", "25.07.2019", "01.08.2019",
+                              "08.08.2019"},
+             ("BOJ", "BLL"): {"01.07.2019", "08.07.2019", "15.07.2019",
+                              "22.07.2019", "29.07.2019", "05.08.2019"},
+             ("BLL", "BOJ"): {"01.07.2019", "08.07.2019", "15.07.2019",
+                              "22.07.2019", "29.07.2019", "05.08.2019"}}
 
     departure_city = args.dest_city if is_return_flight else args.dep_city
     destination_city = args.dep_city if is_return_flight else args.dest_city
     date = args.return_date if is_return_flight else args.dep_date
 
-    # Check routes
-    if departure_city == "CPH" and destination_city == "BOJ"\
-            and date not in CPH_TO_BOJ_DATES:
-        raise ValueError(f"No available flights for date {date}")
-    if departure_city == "BLL" and destination_city == "BOJ"\
-            and date not in BLL_TO_BOJ_DATES:
-        raise ValueError(f"No available flights for date {date}")
-    if departure_city == "BOJ" and destination_city == "CPH"\
-            and date not in BOJ_TO_CPH_DATES:
-        raise ValueError(f"No available flights for date {date}")
-    if departure_city == "BOJ" and destination_city == "BLL"\
-            and date not in BOJ_TO_BLL_DATES:
+    # Check dates
+    if date not in DATES[(departure_city, destination_city)]:
         raise ValueError(f"No available flights for date {date}")
 
 
@@ -73,12 +59,12 @@ def check_route(dep_city, dest_city):
     Also check if departure city and destination city are equal.
     """
 
-    AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
-                        ("BOJ", "BLL"))
+    ROUTES = {("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
+              ("BOJ", "BLL")}
 
     if dep_city == dest_city:
         raise ValueError("Same departure city and destination city")
-    elif (dep_city, dest_city) not in AVAILABLE_ROUTES:
+    elif (dep_city, dest_city) not in ROUTES:
         raise ValueError("Unavailable route")
 
 
@@ -101,6 +87,11 @@ def parse_arguments(args):
     argument_parser.add_argument("adults_children",
                                  help="Number of adults and children")
     argument_parser.add_argument("-return_date", help="return flight date")
+
+    def raise_value_error(err_msg):
+        raise ValueError("Invalid city code")
+
+    argument_parser.error = raise_value_error
 
     return argument_parser.parse_args(args)
 
@@ -129,10 +120,12 @@ def calculate_flight_duration(departure_time, arrival_time):
     correct_minutes = (60 + minutes) if minutes < 0 else minutes
     correct_hours = (hours - 1) if minutes < 0 else hours
 
-    return (":".join([str(correct_hours) if correct_hours >= 10
-                      else f"0{correct_hours}",
-                      str(correct_minutes) if correct_minutes >= 10
-                      else f"0{correct_minutes}"]))
+    duration = [str(correct_hours) if correct_hours >= 10
+                else f"0{correct_hours}",
+                str(correct_minutes) if correct_minutes >= 10
+                else f"0{correct_minutes}"]
+
+    return ":".join(duration)
 
 
 def parse_flight_date(date):
@@ -151,6 +144,7 @@ def parse_flight_date(date):
         elif item == "19":
             parsed_date.append("2019")
         else:
+            # Day format: dd
             parsed_date.append(
                 "".join(["0", item]) if len(item) == 1 else item)
 
@@ -159,15 +153,14 @@ def parse_flight_date(date):
 # TODO: def print_info()
 
 
-def find_flight_info(arguments):
-    """Main function."""
-
+def validate_input_data(arguments):
     # Check city codes
     # FIXME: argparse throw an error. How to avoid this?
     try:
         args = parse_arguments(arguments)
-    except SystemExit:
-        raise SystemExit("Please choose IATA city codes from suggested list: "
+    except ValueError:
+        raise SystemExit("Invalid city code. "
+                         "Please choose IATA city codes from suggested list: "
                          "CPH, BLL, PDV, BOJ, SOF, VAR")
 
     try:
@@ -181,8 +174,6 @@ def find_flight_info(arguments):
         elif value_error.args[0] == "Old date":
             raise SystemExit(
                 "Date is outdated. Please change it to actual date")
-        # elif value_error.args[0] == "Date is older than return date":
-        #     raise SystemExit("Departure date is older than return date")
 
     try:
         check_date_availability(args, False)
@@ -207,7 +198,15 @@ def find_flight_info(arguments):
 
     request = requests.get(create_url(args))
     if request.status_code != 200:
-        raise ValueError("Invalid request")
+        raise SystemExit("Invalid request")
+
+    return args, request
+
+
+def find_flight_info(arguments):
+    """Main function."""
+
+    args, request = validate_input_data(arguments)
 
     tree = lxml.etree.HTML(request.text)  # Full html page code
     table = tree.xpath(
@@ -245,15 +244,13 @@ def find_flight_info(arguments):
             # First and second columns contains radio button and style
             # Row + 1 contains only price
             if len(table[row+1]) == 3:
-                unformatted_price = table[row+1][1].text
-                # unformatted_price[0:9] = "Price = "
-                print("{:<13}".format(unformatted_price[8:]))
+                # table[row+1][1].text[0:9] = "Price = "
+                print("{:<13}".format(table[row+1][1].text[8:]))
             # Row + 1 also contains additional information
             # eg. NO_LUGGAGE_INCLUDED
             elif len(table[row+1]) == 4:
-                unformatted_price = table[row+1][1].text
                 print("{:<13} {:<20}".format(
-                    unformatted_price[8:], table[row+1][2].text))
+                    table[row+1][1].text[8:], table[row+1][2].text))
 
         # Search for coming back flight
         elif flight_date == args.return_date\
@@ -267,9 +264,7 @@ def find_flight_info(arguments):
                 table[row][4].text, table[row][5].text), end="")
 
             if len(table[row+1]) == 3:
-                unformatted_price = table[row+1][1].text
-                print("{:<13}".format(unformatted_price[8:]))
+                print("{:<13}".format(table[row+1][1].text[8:]))
             elif len(table[row+1]) == 4:
-                unformatted_price = table[row+1][1].text
                 print("{:<13} {:<20}".format(
-                    unformatted_price[8:], table[row+1][2].text))
+                    table[row+1][1].text[8:], table[row+1][2].text))
