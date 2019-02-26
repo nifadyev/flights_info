@@ -68,6 +68,14 @@ def check_route(dep_city, dest_city):
         raise ValueError("Unavailable route")
 
 
+def validate_city_code(code):
+    VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
+    if code not in VALID_CODES:
+        raise argparse.ArgumentError("Invalid city code")
+
+    return code
+
+
 def parse_arguments(args):
     """Parse command line arguments using argparse.
     Contains help message.
@@ -78,7 +86,8 @@ def parse_arguments(args):
     argument_parser.add_argument("dep_city",
                                  help="departure city IATA code",
                                  choices=["CPH", "BLL", "PDV", "BOJ",
-                                          "SOF", "VAR"])
+                                          "SOF", "VAR"],
+                                 type=validate_city_code)
     argument_parser.add_argument("dest_city",
                                  help="destination city IATA code",
                                  choices=["CPH", "BLL", "PDV", "BOJ",
@@ -88,10 +97,10 @@ def parse_arguments(args):
                                  help="Number of adults and children")
     argument_parser.add_argument("-return_date", help="return flight date")
 
-    def raise_value_error(err_msg):
-        raise ValueError("Invalid city code")
+    # def raise_value_error(err_msg):
+    #     raise ValueError("Invalid city code")
 
-    argument_parser.error = raise_value_error
+    # argument_parser.error = raise_value_error
 
     return argument_parser.parse_args(args)
 
@@ -162,6 +171,8 @@ def validate_input_data(arguments):
         raise SystemExit("Invalid city code. "
                          "Please choose IATA city codes from suggested list: "
                          "CPH, BLL, PDV, BOJ, SOF, VAR")
+    except argparse.ArgumentError:
+        raise SystemExit("exit")
 
     try:
         validate_date(args.dep_date)
