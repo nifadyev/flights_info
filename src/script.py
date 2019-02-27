@@ -1,35 +1,33 @@
 import argparse
 import datetime
 import lxml.etree
+import lxml.objectify
 import requests
 
 # TODO: decorate main func flight_info by check_args and create_url
 # TODO: output info if one of the args data or return date is invalid
 
 
-# TODO: Sort func by name
+def calculate_flight_duration(departure_time, arrival_time):
+    """Calculate flight duration in format hh:mm.
 
-def validate_date(flight_date):
-    """Check whether date is correctly formatted and not old."""
+       Returns time in format hh:mm.
+    """
 
-    date = tuple(int(i) for i in flight_date.split("."))
-    str_date = tuple(i for i in flight_date.split("."))
-    # current date format: yyyy-mm-dd
-    formatted_date = "-".join(str_date[::-1])
-    current_date = str(datetime.datetime.now().date())
+    parsed_departure_time = tuple(int(i) for i in departure_time.split(":"))
+    parsed_arrival_time = tuple(int(i) for i in arrival_time.split(":"))
 
-    # yyyy-mm-dd
-    if len(formatted_date) != 10:
-        raise ValueError("Invalid date format")
+    minutes = parsed_arrival_time[1] - parsed_departure_time[1]
+    hours = parsed_arrival_time[0] - parsed_departure_time[0]
+    correct_minutes = (60 + minutes) if minutes < 0 else minutes
+    correct_hours = (hours - 1) if minutes < 0 else hours
 
-    # Invalid day, month or year
-    if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
-            or date[2] != 2019:
-        raise ValueError("Invalid date format")
+    duration = [str(correct_hours) if correct_hours >= 10
+                else f"0{correct_hours}",
+                str(correct_minutes) if correct_minutes >= 10
+                else f"0{correct_minutes}"]
 
-    # Date is already past
-    if current_date > formatted_date:
-        raise ValueError("Date in the past")
+    return ":".join(duration)
 
 
 def check_date_availability(args, is_return_flight):
@@ -70,111 +68,55 @@ def check_route(dep_city, dest_city):
         raise ValueError("Unavailable route")
 
 
-# TODO: add description of IATA codes
-def validate_city_code(code):
-    VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
-    if code not in VALID_CODES:
-        raise ValueError("Invalid city code")
-
-
-def parse_arguments(args):
-    """Parse command line arguments using argparse.
-    Contains help message.
-    """
-
-    argument_parser = argparse.ArgumentParser(description="Flight informer")
-
-    argument_parser.add_argument("dep_city",
-                                 help="departure city IATA code")
-    argument_parser.add_argument("dest_city",
-                                 help="destination city IATA code")
-    argument_parser.add_argument("dep_date", help="departure flight date",)
-    argument_parser.add_argument("adults_children",
-                                 help="Number of adults and children")
-    argument_parser.add_argument("-return_date", help="return flight date")
-
-    return argument_parser.parse_args(args)
-
-
-def parse_url_parameters(args):
-    """Create valid url parameters for making a request
-     to Flybulgarien booking engine.
-
-     Returns url parameters.
-     """
-
-    if args.return_date:
-        return {"rt": "", "lang": "en", "depdate": args.dep_date,
-                "aptcode1": args.dep_city, "rtdate": args.return_date,
-                "aptcode2": args.dest_city, "paxcount": args.adults_children}
-
-    return {"ow": "", "lang": "en", "depdate": args.dep_date,
-            "aptcode1": args.dep_city, "aptcode2": args.dest_city,
-            "paxcount": args.adults_children}
-
-
-def calculate_flight_duration(departure_time, arrival_time):
-    """Calculate flight duration in format hh:mm.
-
-       Returns time in format hh:mm.
-    """
-
-    parsed_departure_time = tuple(int(i) for i in departure_time.split(":"))
-    parsed_arrival_time = tuple(int(i) for i in arrival_time.split(":"))
-
-    minutes = parsed_arrival_time[1] - parsed_departure_time[1]
-    hours = parsed_arrival_time[0] - parsed_departure_time[0]
-    correct_minutes = (60 + minutes) if minutes < 0 else minutes
-    correct_hours = (hours - 1) if minutes < 0 else hours
-
-    duration = [str(correct_hours) if correct_hours >= 10
-                else f"0{correct_hours}",
-                str(correct_minutes) if correct_minutes >= 10
-                else f"0{correct_minutes}"]
-
-    return ":".join(duration)
-
-# TODO: get rid of it when replace it with internal method from datetime
-
-
-def validate_input_data(arguments):
-    # Check city codes
-    # FIXME: argparse throw an error. How to avoid this?
-    args = parse_arguments(arguments)
-    validate_city_code(args.dep_city)
-    validate_city_code(args.dest_city)
-    validate_date(args.dep_date)
-    check_date_availability(args, False)
-    # Check route for availability
-    check_route(args.dep_city, args.dest_city)
-    if args.return_date:
-        validate_date(args.return_date)
-        check_date_availability(args, True)
-
-    return args
-
-# TODO: fill here specials struct (namedtuple or dict) and then in separate func print info
-
-
 def find_flight_info(arguments):
     """Main function."""
 
     args = validate_input_data(arguments)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx?",
-                           parse_url_parameters(args))
-    # try:
-    #     text = request.text
-    # if request.text:
-    # tree = lxml.etree.HTML(request.text)
-    # else:
-    # raise ValueError("Request body is empty")
-    tree = lxml.etree.HTML(request.text)  # Full html page code
+                           params=parse_url_parameters(args))
+    # Full html page code
+    if request.text:
+        tree = lxml.etree.HTML(request.text)
+    else:
+        raise ValueError("Request body is empty")
+    # root = lxml.objectify.XML(request.content)
     # TODO: read about diff between HTML and Objectify
-    # TODO: handle exc here
+
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
+    # for item in table:
+    #     print(item)
 
+    # flights_data = {"Direction": "Going Out", "Date": "", "Departure": "",
+    #                 "Arrival": "", "Flight duration": "", "From": "", "To": "",
+    #                 "Price": "", "Additional information": ""}
+    flights_data = {"Going Out": {"Date": "", "Departure": "",
+                                  "Arrival": "", "Flight duration": "", "From": "", "To": "",
+                                  "Price": "", "Additional information": ""},
+                    "Coming back": {"Date": "", "Departure": "",
+                                    "Arrival": "", "Flight duration": "", "From": "", "To": "",
+                                    "Price": "", "Additional information": ""}}
+    # print(next(iter(flights_data.keys())), flights_data["Direction"]["Going Out"].keys())
+
+    # for row in range(2, len(table)):
+    #     if 1 <= len(table[row]) <= 3 or table[row][1].text == "Date":
+    #         continue
+
+    #     flight_date = parse_flight_date(table[row][1].text)
+
+    #     # Search for going out flight
+    #     if flight_date == args.dep_date\
+    #             and args.dep_city in table[row][4].text\
+    #             and args.dest_city in table[row][5].text:
+    #         i = 1
+    #         for key in flights_data["Going Out"].keys():
+    #             if key == "Flight duration":
+    #                 flights_data["Going Out"][key] = calculate_flight_duration(
+    #                     table[row][2].text, table[row][3].text)
+    #             else:
+    #                 flights_data["Going Out"][key] = table[row][i].text
+    #                 i += 1
     # Table header
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
         ".format("Direction", table[1][1].text, table[1][2].text,
@@ -186,8 +128,7 @@ def find_flight_info(arguments):
     for row in range(2, len(table)):
         # Empty row, with price, with price and additional info or with table2
         # header or with table2 name
-        if len(table[row]) == 1 or len(table[row]) == 2\
-                or len(table[row]) == 3 or table[row][1].text == "Date":
+        if 1 <= len(table[row]) <= 3 or table[row][1].text == "Date":
             continue
 
         flight_date = parse_flight_date(table[row][1].text)
@@ -232,6 +173,27 @@ def find_flight_info(arguments):
                     table[row+1][1].text[8:], table[row+1][2].text))
 
 
+def parse_arguments(args):
+    """Parse command line arguments using argparse.
+    Contains help message.
+    """
+
+    argument_parser = argparse.ArgumentParser(description="Flight informer")
+
+    argument_parser.add_argument("dep_city",
+                                 help="departure city IATA code")
+    argument_parser.add_argument("dest_city",
+                                 help="destination city IATA code")
+    argument_parser.add_argument("dep_date", help="departure flight date",)
+    argument_parser.add_argument("adults_children",
+                                 help="Number of adults and children")
+    argument_parser.add_argument("-return_date", help="return flight date")
+
+    return argument_parser.parse_args(args)
+
+# TODO: get rid of it when replace it with internal method from datetime
+
+
 def parse_flight_date(date):
     """Parse date to format dd.mm.yyyy."""
 
@@ -254,3 +216,70 @@ def parse_flight_date(date):
                 "".join(["0", item]) if len(item) == 1 else item)
 
     return ".".join(parsed_date)
+
+
+def parse_url_parameters(args):
+    """Create valid url parameters for making a request
+     to Flybulgarien booking engine.
+
+     Returns url parameters.
+     """
+
+    if args.return_date:
+        return {"rt": "", "lang": "en", "depdate": args.dep_date,
+                "aptcode1": args.dep_city, "rtdate": args.return_date,
+                "aptcode2": args.dest_city, "paxcount": args.adults_children}
+
+    return {"ow": "", "lang": "en", "depdate": args.dep_date,
+            "aptcode1": args.dep_city, "aptcode2": args.dest_city,
+            "paxcount": args.adults_children}
+
+# TODO: add description of IATA codes
+
+
+def validate_city_code(code):
+    VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
+    if code not in VALID_CODES:
+        raise ValueError("Invalid city code")
+
+
+def validate_date(flight_date):
+    """Check whether date is correctly formatted and not old."""
+
+    date = tuple(int(i) for i in flight_date.split("."))
+    str_date = tuple(i for i in flight_date.split("."))
+    # current date format: yyyy-mm-dd
+    formatted_date = "-".join(str_date[::-1])
+    current_date = str(datetime.datetime.now().date())
+
+    # yyyy-mm-dd
+    if len(formatted_date) != 10:
+        raise ValueError("Invalid date format")
+
+    # Invalid day, month or year
+    if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
+            or date[2] != 2019:
+        raise ValueError("Invalid date format")
+
+    # Date is already past
+    if current_date > formatted_date:
+        raise ValueError("Date in the past")
+
+
+def validate_input_data(arguments):
+    # Check city codes
+    # FIXME: argparse throw an error. How to avoid this?
+    args = parse_arguments(arguments)
+    validate_city_code(args.dep_city)
+    validate_city_code(args.dest_city)
+    validate_date(args.dep_date)
+    check_date_availability(args, False)
+    # Check route for availability
+    check_route(args.dep_city, args.dest_city)
+    if args.return_date:
+        validate_date(args.return_date)
+        check_date_availability(args, True)
+
+    return args
+
+# TODO: fill here specials struct (namedtuple or dict) and then in separate func print info
