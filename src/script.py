@@ -7,6 +7,8 @@ import requests
 # TODO: output info if one of the args data or return date is invalid
 
 
+# TODO: Sort func by name
+
 def validate_date(flight_date):
     """Check whether date is correctly formatted and not old."""
 
@@ -27,7 +29,7 @@ def validate_date(flight_date):
 
     # Date is already past
     if current_date > formatted_date:
-        raise ValueError("Old date")
+        raise ValueError("Date in the past")
 
 
 def check_date_availability(args, is_return_flight):
@@ -68,12 +70,11 @@ def check_route(dep_city, dest_city):
         raise ValueError("Unavailable route")
 
 
+# TODO: add description of IATA codes
 def validate_city_code(code):
     VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
     if code not in VALID_CODES:
-        raise argparse.ArgumentError("Invalid city code")
-
-    return code
+        raise ValueError("Invalid city code")
 
 
 def parse_arguments(args):
@@ -82,37 +83,34 @@ def parse_arguments(args):
     """
 
     argument_parser = argparse.ArgumentParser(description="Flight informer")
-    # TODO: add description of IATA codes
+
     argument_parser.add_argument("dep_city",
-                                 help="departure city IATA code",
-                                 choices=["CPH", "BLL", "PDV", "BOJ",
-                                          "SOF", "VAR"],
-                                 type=validate_city_code)
+                                 help="departure city IATA code")
     argument_parser.add_argument("dest_city",
-                                 help="destination city IATA code",
-                                 choices=["CPH", "BLL", "PDV", "BOJ",
-                                          "SOF", "VAR"])
+                                 help="destination city IATA code")
     argument_parser.add_argument("dep_date", help="departure flight date",)
     argument_parser.add_argument("adults_children",
                                  help="Number of adults and children")
     argument_parser.add_argument("-return_date", help="return flight date")
 
-    # def raise_value_error(err_msg):
-    #     raise ValueError("Invalid city code")
-
-    # argument_parser.error = raise_value_error
-
     return argument_parser.parse_args(args)
 
 
-def create_url(args):
-    """Create valid url for making a request to Flybulgarien booking engine."""
+def parse_url_parameters(args):
+    """Create valid url parameters for making a request
+     to Flybulgarien booking engine.
 
-    return f"https://apps.penguin.bg/fly/quote3.aspx?"\
-        f"{'rt=' if args.return_date else 'ow='}"\
-        f"&lang=en&depdate={args.dep_date}&aptcode1={args.dep_city}"\
-        f"{f'&rtdate={args.return_date}' if args.return_date else ''}"\
-        f"&aptcode2={args.dest_city}&paxcount={args.adults_children}&infcount="
+     Returns url parameters.
+     """
+
+    if args.return_date:
+        return {"rt": "", "lang": "en", "depdate": args.dep_date,
+                "aptcode1": args.dep_city, "rtdate": args.return_date,
+                "aptcode2": args.dest_city, "paxcount": args.adults_children}
+
+    return {"ow": "", "lang": "en", "depdate": args.dep_date,
+            "aptcode1": args.dep_city, "aptcode2": args.dest_city,
+            "paxcount": args.adults_children}
 
 
 def calculate_flight_duration(departure_time, arrival_time):
@@ -136,90 +134,43 @@ def calculate_flight_duration(departure_time, arrival_time):
 
     return ":".join(duration)
 
-
-def parse_flight_date(date):
-    """Parse date to format dd.mm.yyyy."""
-
-    parsed_date = list()
-
-    # First 5 chars of date contain weekday
-    for item in date[5:].split(" "):
-        if item == "Jun":
-            parsed_date.append("06")
-        elif item == "Jul":
-            parsed_date.append("07")
-        elif item == "Aug":
-            parsed_date.append("08")
-        elif item == "19":
-            parsed_date.append("2019")
-        else:
-            # Day format: dd
-            parsed_date.append(
-                "".join(["0", item]) if len(item) == 1 else item)
-
-    return ".".join(parsed_date)
-
-# TODO: def print_info()
+# TODO: get rid of it when replace it with internal method from datetime
 
 
 def validate_input_data(arguments):
     # Check city codes
     # FIXME: argparse throw an error. How to avoid this?
-    try:
-        args = parse_arguments(arguments)
-    except ValueError:
-        raise SystemExit("Invalid city code. "
-                         "Please choose IATA city codes from suggested list: "
-                         "CPH, BLL, PDV, BOJ, SOF, VAR")
-    except argparse.ArgumentError:
-        raise SystemExit("exit")
-
-    try:
-        validate_date(args.dep_date)
-        if args.return_date:
-            validate_date(args.return_date)
-    except ValueError as value_error:
-        if value_error.args[0] == "Invalid date format":
-            raise SystemExit("Invalid date format. Please make sure that date"
-                             " follows this format: dd.mm.yyyy")
-        elif value_error.args[0] == "Old date":
-            raise SystemExit(
-                "Date is outdated. Please change it to actual date")
-
-    try:
-        check_date_availability(args, False)
-        if args.return_date:
-            check_date_availability(args, True)
-    except ValueError as value_error:
-        raise SystemExit("No available flights for specified date. "
-                         "Please choose date from ")
-
+    args = parse_arguments(arguments)
+    validate_city_code(args.dep_city)
+    validate_city_code(args.dest_city)
+    validate_date(args.dep_date)
+    check_date_availability(args, False)
     # Check route for availability
-    try:
-        check_route(args.dep_city, args.dest_city)
-    except ValueError as value_error:
-        if value_error.args[0] == "Same departure city and destination city":
-            raise SystemExit(
-                f"Departure city and destination city must differ,\
-                  please try again")
-        elif value_error.args[0] == "Unavailable route":
-            raise SystemExit(
-                f"Route {args.dep_city}-{args.dest_city} is unavailable,\
-                  please choose one from these: ")
+    check_route(args.dep_city, args.dest_city)
+    if args.return_date:
+        validate_date(args.return_date)
+        check_date_availability(args, True)
 
-    request = requests.get(create_url(args))
-    if request.status_code != 200:
-        raise SystemExit("Invalid request")
+    return args
 
-    return args, request
+# TODO: fill here specials struct (namedtuple or dict) and then in separate func print info
 
 
 def find_flight_info(arguments):
     """Main function."""
 
-    args, request = validate_input_data(arguments)
-
+    args = validate_input_data(arguments)
+    request = requests.get("https://apps.penguin.bg/fly/quote3.aspx?",
+                           parse_url_parameters(args))
+    # try:
+    #     text = request.text
+    # if request.text:
+    # tree = lxml.etree.HTML(request.text)
+    # else:
+    # raise ValueError("Request body is empty")
     tree = lxml.etree.HTML(request.text)  # Full html page code
+    # TODO: read about diff between HTML and Objectify
+    # TODO: handle exc here
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
@@ -279,3 +230,27 @@ def find_flight_info(arguments):
             elif len(table[row+1]) == 4:
                 print("{:<13} {:<20}".format(
                     table[row+1][1].text[8:], table[row+1][2].text))
+
+
+def parse_flight_date(date):
+    """Parse date to format dd.mm.yyyy."""
+
+    parsed_date = list()
+
+    # First 5 chars of date contain weekday
+    for item in date[5:].split(" "):
+        # TODO: inspect datetime
+        if item == "Jun":
+            parsed_date.append("06")
+        elif item == "Jul":
+            parsed_date.append("07")
+        elif item == "Aug":
+            parsed_date.append("08")
+        elif item == "19":
+            parsed_date.append("2019")
+        else:
+            # Day format: dd
+            parsed_date.append(
+                "".join(["0", item]) if len(item) == 1 else item)
+
+    return ".".join(parsed_date)
