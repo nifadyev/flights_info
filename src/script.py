@@ -3,6 +3,7 @@ import datetime
 import lxml.etree
 import lxml.objectify
 import requests
+import collections
 
 # TODO: decorate main func flight_info by check_args and create_url
 # TODO: output info if one of the args data or return date is invalid
@@ -85,44 +86,16 @@ def find_flight_info(arguments):
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
-    # for item in table:
-    #     print(item)
 
-    # flights_data = {"Direction": "Going Out", "Date": "", "Departure": "",
-    #                 "Arrival": "", "Flight duration": "", "From": "", "To": "",
-    #                 "Price": "", "Additional information": ""}
     flights_data = {"Going Out": {"Date": "", "Departure": "",
-                                  "Arrival": "", "Flight duration": "", "From": "", "To": "",
-                                  "Price": "", "Additional information": ""},
+                                  "Arrival": "", "Flight duration": "",
+                                  "From": "", "To": "", "Price": "",
+                                  "Additional information": ""},
                     "Coming back": {"Date": "", "Departure": "",
-                                    "Arrival": "", "Flight duration": "", "From": "", "To": "",
-                                    "Price": "", "Additional information": ""}}
-    # print(next(iter(flights_data.keys())), flights_data["Direction"]["Going Out"].keys())
+                                    "Arrival": "", "Flight duration": "",
+                                    "From": "", "To": "", "Price": "",
+                                    "Additional information": ""}}
 
-    # for row in range(2, len(table)):
-    #     if 1 <= len(table[row]) <= 3 or table[row][1].text == "Date":
-    #         continue
-
-    #     flight_date = parse_flight_date(table[row][1].text)
-
-    #     # Search for going out flight
-    #     if flight_date == args.dep_date\
-    #             and args.dep_city in table[row][4].text\
-    #             and args.dest_city in table[row][5].text:
-    #         i = 1
-    #         for key in flights_data["Going Out"].keys():
-    #             if key == "Flight duration":
-    #                 flights_data["Going Out"][key] = calculate_flight_duration(
-    #                     table[row][2].text, table[row][3].text)
-    #             else:
-    #                 flights_data["Going Out"][key] = table[row][i].text
-    #                 i += 1
-    # Table header
-    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
-        ".format("Direction", table[1][1].text, table[1][2].text,
-                 table[1][3].text, "Flight duration", table[1][4].text,
-                 table[1][5].text, "Price", "Additional information"))
-    # Price is displayed per person
     # TODO: maybe change price to total cost or just remove adults arg
     # First and second table rows contains table name and names of columns
     for row in range(2, len(table)):
@@ -134,43 +107,20 @@ def find_flight_info(arguments):
         flight_date = parse_flight_date(table[row][1].text)
 
         # Search for going out flight
+        # table[row][4:5].text contains city name and city code => in
         if flight_date == args.dep_date\
                 and args.dep_city in table[row][4].text\
                 and args.dest_city in table[row][5].text:
-            print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<21}".format(
-                "Going out",
-                table[row][1].text, table[row][2].text, table[row][3].text,
-                calculate_flight_duration(
-                    table[row][2].text, table[row][3].text),
-                table[row][4].text, table[row][5].text), end="")
+            write_flight_information(
+                flights_data["Going Out"], table[row], table[row+1])
 
-            # First and second columns contains radio button and style
-            # Row + 1 contains only price
-            if len(table[row+1]) == 3:
-                # table[row+1][1].text[0:9] = "Price = "
-                print("{:<13}".format(table[row+1][1].text[8:]))
-            # Row + 1 also contains additional information
-            # eg. NO_LUGGAGE_INCLUDED
-            elif len(table[row+1]) == 4:
-                print("{:<13} {:<20}".format(
-                    table[row+1][1].text[8:], table[row+1][2].text))
-
-        # Search for coming back flight
         elif flight_date == args.return_date\
                 and args.dest_city in table[row][4].text\
                 and args.dep_city in table[row][5].text:
-            print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<21}".format(
-                "Coming back",
-                table[row][1].text, table[row][2].text, table[row][3].text,
-                calculate_flight_duration(
-                    table[row][2].text, table[row][3].text),
-                table[row][4].text, table[row][5].text), end="")
+            write_flight_information(
+                flights_data["Coming back"], table[row], table[row+1])
 
-            if len(table[row+1]) == 3:
-                print("{:<13}".format(table[row+1][1].text[8:]))
-            elif len(table[row+1]) == 4:
-                print("{:<13} {:<20}".format(
-                    table[row+1][1].text[8:], table[row+1][2].text))
+    print_flights_information(flights_data)
 
 
 def parse_arguments(args):
@@ -181,9 +131,11 @@ def parse_arguments(args):
     argument_parser = argparse.ArgumentParser(description="Flight informer")
 
     argument_parser.add_argument("dep_city",
-                                 help="departure city IATA code")
+                                 help="departure city IATA code",
+                                 type=validate_city_code)
     argument_parser.add_argument("dest_city",
-                                 help="destination city IATA code")
+                                 help="destination city IATA code",
+                                 type=validate_city_code)
     argument_parser.add_argument("dep_date", help="departure flight date",)
     argument_parser.add_argument("adults_children",
                                  help="Number of adults and children")
@@ -237,10 +189,24 @@ def parse_url_parameters(args):
 # TODO: add description of IATA codes
 
 
+def print_flights_information(flights_info):
+    # Table header
+    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
+        ".format("Direction", *flights_info["Going Out"].keys()))
+
+    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
+        ".format("Going Out", *flights_info["Going Out"].values()))
+    if flights_info["Coming back"]["Date"]:
+        print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
+            ".format("Coming back", *flights_info["Coming back"].values()))
+
+
 def validate_city_code(code):
     VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
     if code not in VALID_CODES:
-        raise ValueError("Invalid city code")
+        raise argparse.ArgumentTypeError("Invalid city code")
+
+    return code
 
 
 def validate_date(flight_date):
@@ -270,8 +236,8 @@ def validate_input_data(arguments):
     # Check city codes
     # FIXME: argparse throw an error. How to avoid this?
     args = parse_arguments(arguments)
-    validate_city_code(args.dep_city)
-    validate_city_code(args.dest_city)
+    # validate_city_code(args.dep_city)
+    # validate_city_code(args.dest_city)
     validate_date(args.dep_date)
     check_date_availability(args, False)
     # Check route for availability
@@ -282,4 +248,25 @@ def validate_input_data(arguments):
 
     return args
 
-# TODO: fill here specials struct (namedtuple or dict) and then in separate func print info
+# TODO: fill here specials struct (namedtuple or dict)
+# and then in separate func print info
+
+
+def write_flight_information(dest, flight_info, extra_flight_info):
+    i = 1
+
+    for key in dest:
+        if key == "Flight duration":
+            dest[key] = calculate_flight_duration(
+                flight_info[2].text, flight_info[3].text)
+        # Price is displayed per person
+        elif key == "Price" and extra_flight_info[1].text:
+            # table[row+1][1].text[0:9] = "Price = "
+            dest[key] = extra_flight_info[1].text[8:]
+        # Row + 1 also contains additional information
+        # eg. NO_LUGGAGE_INCLUDED
+        elif key == "Additional information" and extra_flight_info[2].text:
+            dest[key] = extra_flight_info[2].text
+        elif i < 6:
+            dest[key] = flight_info[i].text if flight_info[i].text else ""
+            i += 1
