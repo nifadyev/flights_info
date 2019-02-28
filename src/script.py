@@ -10,10 +10,7 @@ import collections
 
 
 def calculate_flight_duration(departure_time, arrival_time):
-    """Calculate flight duration in format hh:mm.
-
-       Returns time in format hh:mm.
-    """
+    """Return flight duration in format hh:mm."""
 
     parsed_departure_time = tuple(int(i) for i in departure_time.split(":"))
     parsed_arrival_time = tuple(int(i) for i in arrival_time.split(":"))
@@ -70,7 +67,7 @@ def check_route(dep_city, dest_city):
 
 
 def find_flight_info(arguments):
-    """Main function."""
+    """Searcg for available flights and output found info to console."""
 
     args = validate_input_data(arguments)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx?",
@@ -86,6 +83,9 @@ def find_flight_info(arguments):
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
+
+    # Flight = collections.namedtuple("Flight", "Date, Departure, Arrival,\
+    # Flight duration, From, To, Price, Additional information")
 
     flights_data = {"Going Out": {"Date": "", "Departure": "",
                                   "Arrival": "", "Flight duration": "",
@@ -104,7 +104,9 @@ def find_flight_info(arguments):
         if 1 <= len(table[row]) <= 3 or table[row][1].text == "Date":
             continue
 
-        flight_date = parse_flight_date(table[row][1].text)
+        # ? Could it be simplified
+        flight_date = datetime.datetime.strptime(
+            table[row][1].text[5:], "%d %b %y").strftime("%d.%m.%Y")
 
         # Search for going out flight
         # table[row][4:5].text contains city name and city code => in
@@ -113,6 +115,9 @@ def find_flight_info(arguments):
                 and args.dest_city in table[row][5].text:
             write_flight_information(
                 flights_data["Going Out"], table[row], table[row+1])
+            # going_out = Flight()
+            # write_flight_information(
+            #     Flight, table[row], table[row+1])
 
         elif flight_date == args.return_date\
                 and args.dest_city in table[row][4].text\
@@ -125,7 +130,7 @@ def find_flight_info(arguments):
 
 def parse_arguments(args):
     """Parse command line arguments using argparse.
-    Contains help message.
+    Contain help message.
     """
 
     argument_parser = argparse.ArgumentParser(description="Flight informer")
@@ -143,38 +148,10 @@ def parse_arguments(args):
 
     return argument_parser.parse_args(args)
 
-# TODO: get rid of it when replace it with internal method from datetime
-
-
-def parse_flight_date(date):
-    """Parse date to format dd.mm.yyyy."""
-
-    parsed_date = list()
-
-    # First 5 chars of date contain weekday
-    for item in date[5:].split(" "):
-        # TODO: inspect datetime
-        if item == "Jun":
-            parsed_date.append("06")
-        elif item == "Jul":
-            parsed_date.append("07")
-        elif item == "Aug":
-            parsed_date.append("08")
-        elif item == "19":
-            parsed_date.append("2019")
-        else:
-            # Day format: dd
-            parsed_date.append(
-                "".join(["0", item]) if len(item) == 1 else item)
-
-    return ".".join(parsed_date)
-
 
 def parse_url_parameters(args):
-    """Create valid url parameters for making a request
+    """Return valid url parameters for making a request
      to Flybulgarien booking engine.
-
-     Returns url parameters.
      """
 
     if args.return_date:
@@ -190,6 +167,8 @@ def parse_url_parameters(args):
 
 
 def print_flights_information(flights_info):
+    """Output table containing inforamtion about flights."""
+
     # Table header
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
         ".format("Direction", *flights_info["Going Out"].keys()))
@@ -202,7 +181,12 @@ def print_flights_information(flights_info):
 
 
 def validate_city_code(code):
+    """Return city code if it is valid.
+    Raise ArgumentError otherwise.
+    """
+
     VALID_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
+
     if code not in VALID_CODES:
         raise argparse.ArgumentTypeError("Invalid city code")
 
@@ -210,34 +194,30 @@ def validate_city_code(code):
 
 
 def validate_date(flight_date):
-    """Check whether date is correctly formatted and not old."""
+    """Raise ValueError if date is invalid or in the past."""
 
-    date = tuple(int(i) for i in flight_date.split("."))
-    str_date = tuple(i for i in flight_date.split("."))
-    # current date format: yyyy-mm-dd
-    formatted_date = "-".join(str_date[::-1])
-    current_date = str(datetime.datetime.now().date())
+    # ? Why reversed is needed
+    parsed_date = tuple(int(i) for i in flight_date.split("."))
+    # current date format: dd.mm.yyyy
 
-    # yyyy-mm-dd
-    if len(formatted_date) != 10:
-        raise ValueError("Invalid date format")
+    try:
+        datetime.date(*reversed(parsed_date)).strftime("%d.%m.%Y")
+    except ValueError as value_error:
+        raise ValueError(f"{value_error.args[0]}. Please enter valid date")
 
-    # Invalid day, month or year
-    if date[0] < 1 or date[0] > 31 or date[1] < 1 or date[1] > 12\
-            or date[2] != 2019:
-        raise ValueError("Invalid date format")
-
-    # Date is already past
-    if current_date > formatted_date:
+    if datetime.date.today() > datetime.date(*reversed(parsed_date)):
         raise ValueError("Date in the past")
 
 
 def validate_input_data(arguments):
+    """ Validate all input arguments.
+    Raise exceptions if they are invalid.
+
+    Return parsed arguments. 
+    """
     # Check city codes
     # FIXME: argparse throw an error. How to avoid this?
     args = parse_arguments(arguments)
-    # validate_city_code(args.dep_city)
-    # validate_city_code(args.dest_city)
     validate_date(args.dep_date)
     check_date_availability(args, False)
     # Check route for availability
@@ -248,13 +228,13 @@ def validate_input_data(arguments):
 
     return args
 
-# TODO: fill here specials struct (namedtuple or dict)
-# and then in separate func print info
-
 
 def write_flight_information(dest, flight_info, extra_flight_info):
-    i = 1
+    """Write flight information to dest data structure (dict)."""
 
+    i = 1
+    # TODO: create list with result values and unpack it in Flight namedtuple
+    # Flight._make(iterable)
     for key in dest:
         if key == "Flight duration":
             dest[key] = calculate_flight_duration(
