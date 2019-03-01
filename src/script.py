@@ -3,11 +3,10 @@ import datetime
 import lxml.etree
 import lxml.objectify
 import requests
-import collections
 
 # TODO: decorate main func flight_info by check_args and create_url
 # TODO: change names going out and coming back to outbound and inbound
-# TODO: strange blank line at the end of the table
+
 
 def calculate_flight_duration(departure_time, arrival_time):
     """Return flight duration in format hh:mm."""
@@ -17,9 +16,11 @@ def calculate_flight_duration(departure_time, arrival_time):
     duration = datetime.timedelta(hours=arr_time.hour - dep_time.hour,
                                   minutes=arr_time.minute - dep_time.minute)
 
+    # Remove seconds from output
     return str(duration)[:-3]
 
 
+# All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "17.07.2019", "24.07.2019", "31.07.2019",
                           "07.08.2019"},
@@ -32,33 +33,43 @@ DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "22.07.2019", "29.07.2019", "05.08.2019"}}
 
 
-def check_route(args, two_way_trip):
-    """Raise KeyError if route is not in DATES."""
-    """Check flight availability for specified date."""
+def check_route(args):
+    """Check current route for availability.
 
-    if two_way_trip and datetime.datetime.strptime(args.dep_date, "%d.%m.%Y")\
+    Raise KeyError if route is not in DATES.
+    Raise ValueError if departure date is in the past. 
+    """
+
+    if args.return_date\
+        and datetime.datetime.strptime(args.dep_date, "%d.%m.%Y")\
             > datetime.datetime.strptime(args.return_date, "%d.%m.%Y"):
-        raise ValueError(
-            "Departure date is in the past in comparison with return date")
-    # Only these routes are available
+
+        raise ValueError("Departure date is in the past"
+                         "in comparison with return date")
+
     if (args.dep_city, args.dest_city) not in DATES:
         raise KeyError("Unavailable route")
 
-    # Available flight dates for each possible route
-    departure_city = args.dest_city if two_way_trip else args.dep_city
-    destination_city = args.dep_city if two_way_trip else args.dest_city
-    date = args.return_date if two_way_trip else args.dep_date
+    # ? whats better: 3 if statements or 1 if but 8 lines of code
+    if args.return_date:
+        departure_city = args.dest_city
+        destination_city = args.dep_city
+        date = args.return_date
+    else:
+        departure_city = args.dep_city
+        destination_city = args.dest_city
+        date = args.dep_date
 
-    # Check dates
     if date not in DATES[(departure_city, destination_city)]:
-        raise KeyError(f"No available flights for date {date}")
+        raise KeyError(f"No available flights for chosen dates")
 
 
 def find_flight_info(arguments):
     # TODO: Modify docstring
     """Search for available flights and output found info to console."""
 
-    args = validate_input_data(arguments)
+    args = parse_arguments(arguments)
+    check_route(args)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx?",
                            params=parse_url_parameters(args))
 
@@ -79,6 +90,7 @@ def find_flight_info(arguments):
                                     "Arrival": "", "Flight duration": "",
                                     "From": "", "To": "", "Price": "",
                                     "Additional information": ""}}
+
     main_info = list()
     outbound_flight = False
     for row in table:
@@ -104,13 +116,13 @@ def find_flight_info(arguments):
                 and args.dep_city in row[4].text\
                 and args.dest_city in row[5].text:
 
-            main_info = tuple(cell.text for cell in row)
+            main_info = tuple(item.text for item in row)
             outbound_flight = True
         elif flight_date == args.return_date\
                 and args.dest_city in row[4].text\
                 and args.dep_city in row[5].text:
 
-            main_info = tuple(cell.text for cell in row)
+            main_info = tuple(item.text for item in row)
             outbound_flight = False
 
     print_flights_information(flights_data)
@@ -119,7 +131,7 @@ def find_flight_info(arguments):
 def parse_arguments(args):
     """Handle command line arguments.
 
-    Raise ArgumentError if arguments type incorrect.
+    Raise ArgumentError if argument's type is incorrect.
     Return valid arguments.
     """
 
@@ -133,6 +145,7 @@ def parse_arguments(args):
                                  type=validate_city_code)
     argument_parser.add_argument("dep_date", help="departure flight date",
                                  type=validate_date)
+    # Probably deprecated => get rid of this arg globally
     argument_parser.add_argument("adults_children",
                                  help="Number of adults and children")
     argument_parser.add_argument("-return_date", help="return flight date",
@@ -144,15 +157,15 @@ def parse_arguments(args):
 def parse_url_parameters(args):
     """Return valid url parameters for requests.get method."""
 
-    result = {"rt" if args.return_date else "ow": "", "lang": "en",
+    params = {"rt" if args.return_date else "ow": "", "lang": "en",
               "depdate": args.dep_date,
               "aptcode1": args.dep_city, "rtdate": args.return_date,
               "aptcode2": args.dest_city, "paxcount": args.adults_children}
 
     if not args.return_date:
-        del result["rtdate"]
+        del params["rtdate"]
 
-    return result
+    return params
 
 
 def print_flights_information(flights_info):
@@ -185,64 +198,42 @@ def validate_city_code(code):
 
 
 def validate_date(flight_date):
-    """Raise ValueError if date is invalid or in the past."""
+    """Raise ValueError if date is invalid or in the past.
 
-    # ? Why reversed is needed
-    # TODO: use datetime methods instead of tuple
+    Return valid date.
+    """
+
     parsed_dates = datetime.datetime.strptime(
-        flight_date, "%d.%m.%Y").strftime("%d.%m.%Y")
-    parsed_date = tuple(int(i) for i in flight_date.split("."))
+        flight_date, "%d.%m.%Y")
 
-    try:
-        datetime.date(*reversed(parsed_date)).strftime("%d.%m.%Y")
-    except ValueError as value_error:
-        raise ValueError(f"{value_error.args[0]}. Please enter valid date")
-
-    # if datetime.date.today().strftime("%d.%m.%Y") > datetime.date(*reversed(parsed_date)):
-    if datetime.date.today() > datetime.date(*reversed(parsed_date)):
+    if datetime.datetime.today() > parsed_dates:
         raise ValueError("Date in the past")
 
     return flight_date
 
 
-def validate_input_data(arguments):
-    """ Validate all input arguments.
-    Raise exceptions if they are invalid.
+def write_flight_information(flights_data, route_info, extra_route_info):
+    """Write flight information to flights_data data structure (dict).
 
-    Return parsed arguments.
+    Keyword arguments:
+        flights_data -- dictionary with ready to print flights information.
+        route_info -- main information about current route.
+        extra_route_info -- price and additional information about route.
     """
-    # Check city codes
-    args = parse_arguments(arguments)
-    # validate_date(args.dep_date)
-    # check_date_availability(args, False)
-    # Check route for availability
-    check_route(args, False)
-    if args.return_date:
-        check_route(args, True)
-        # validate_date(args.return_date)
-        # check_date_availability(args, True)
-    return args
 
-
-def write_flight_information(dest, flight_info, extra_flight_info):
-    """Write flight information to dest data structure (dict)."""
-    # TODO: modify docstring: describe args
     # TODO: rename i or get rid of it
     i = 1
-    # TODO: create list with result values and unpack it in Flight namedtuple
-    # Flight._make(iterable)
-    for key in dest:
+    for key in flights_data:
         if key == "Flight duration":
-            dest[key] = calculate_flight_duration(
-                flight_info[2], flight_info[3])
+            flights_data[key] = calculate_flight_duration(
+                route_info[2], route_info[3])
         # Price is displayed per person
-        elif key == "Price" and extra_flight_info[0]:
+        elif key == "Price" and extra_route_info[0]:
             # table[row+1][1].text[0:9] = "Price = "
-            dest[key] = extra_flight_info[0]
-        # Row + 1 also contains additional information
-        # eg. NO_LUGGAGE_INCLUDED
-        elif key == "Additional information" and extra_flight_info[1]:
-            dest[key] = extra_flight_info[1]
+            flights_data[key] = extra_route_info[0]
+        # Row+1 also contains additional information (eg. NO_LUGGAGE_INCLUDED)
+        elif key == "Additional information" and extra_route_info[1]:
+            flights_data[key] = extra_route_info[1]
         elif i < 6:
-            dest[key] = flight_info[i] if flight_info[i] else ""
+            flights_data[key] = route_info[i] if route_info[i] else ""
             i += 1
