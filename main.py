@@ -3,9 +3,9 @@ import src.script as source
 
 
 def main():
-    """Demonstrate program functional."""
+    """Flights_info demo."""
 
-    source.find_flight_info(sys.argv[1:])
+    source.print_flights_information(source.find_flight_info(sys.argv[1:]))
 
 
 if __name__ == "__main__":
