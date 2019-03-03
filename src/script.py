@@ -1,11 +1,11 @@
 import argparse
 import datetime
 import lxml.etree
-import lxml.objectify
 import requests
 
-# TODO: decorate main func flight_info by check_args and create_url
-# TODO: change names going out and coming back to outbound and inbound
+# TODO: add persons arg validation
+# TODO: Handle cases where there is no flight info
+# TODO: find it in prev commits (case: persons= -2)
 
 
 def calculate_flight_duration(departure_time, arrival_time):
@@ -37,7 +37,7 @@ def check_route(args):
     """Check current route for availability.
 
     Raise KeyError if route is not in DATES.
-    Raise ValueError if departure date is in the past. 
+    Raise ValueError if departure date is in the past.
     """
 
     if args.return_date\
@@ -61,12 +61,14 @@ def check_route(args):
         date = args.dep_date
 
     if date not in DATES[(departure_city, destination_city)]:
-        raise KeyError(f"No available flights for chosen dates")
+        raise KeyError("No available flights for chosen dates")
 
 
 def find_flight_info(arguments):
-    # TODO: Modify docstring
-    """Search for available flights and output found info to console."""
+    """Search for available flights.
+
+    Return full available information about flights as dict.
+    """
 
     args = parse_arguments(arguments)
     check_route(args)
@@ -76,20 +78,21 @@ def find_flight_info(arguments):
     if request.text:
         tree = lxml.etree.HTML(request.text)
     else:
+        # TODO: probably change error type
         raise ValueError("Request body is empty")
 
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
 
-    flights_data = {"Going Out": {"Date": "", "Departure": "",
-                                  "Arrival": "", "Flight duration": "",
-                                  "From": "", "To": "", "Price": "",
-                                  "Additional information": ""},
-                    "Coming back": {"Date": "", "Departure": "",
-                                    "Arrival": "", "Flight duration": "",
-                                    "From": "", "To": "", "Price": "",
-                                    "Additional information": ""}}
+    flights_data = {"Outbound": {"Date": "", "Departure": "",
+                                 "Arrival": "", "Flight duration": "",
+                                 "From": "", "To": "", "Price": "",
+                                 "Additional information": ""},
+                    "Inbound": {"Date": "", "Departure": "",
+                                "Arrival": "", "Flight duration": "",
+                                "From": "", "To": "", "Price": "",
+                                "Additional information": ""}}
 
     main_info = list()
     outbound_flight = False
@@ -98,10 +101,10 @@ def find_flight_info(arguments):
             if len(row) == 3 and main_info:
                 extra_info = (row[1].text[8:] if row[1].text else "",
                               row[2].text if row[2].text else "")
-                write_flight_information(flights_data["Going Out"
+                write_flight_information(flights_data["Outbound"
                                                       if outbound_flight
-                                                      else "Coming back"],
-                                         main_info, extra_info)
+                                                      else "Inbound"],
+                                         main_info, extra_info, args.persons)
                 main_info = list()
             continue
 
@@ -110,7 +113,6 @@ def find_flight_info(arguments):
         flight_date = datetime.datetime.strptime(
             row[1].text[5:], "%d %b %y").strftime("%d.%m.%Y")
 
-        # Search for going out flight
         # row[4:5].text contains city name and city code => in
         if flight_date == args.dep_date\
                 and args.dep_city in row[4].text\
@@ -125,7 +127,7 @@ def find_flight_info(arguments):
             main_info = tuple(item.text for item in row)
             outbound_flight = False
 
-    print_flights_information(flights_data)
+    return flights_data
 
 
 def parse_arguments(args):
@@ -145,11 +147,19 @@ def parse_arguments(args):
                                  type=validate_city_code)
     argument_parser.add_argument("dep_date", help="departure flight date",
                                  type=validate_date)
-    # Probably deprecated => get rid of this arg globally
-    argument_parser.add_argument("adults_children",
-                                 help="Number of adults and children")
+    argument_parser.add_argument("persons",
+                                 help="Total number of persons",
+                                 type=validate_persons)
     argument_parser.add_argument("-return_date", help="return flight date",
                                  type=validate_date)
+
+    # ? what's better: pretty error message by argparse but ugly test output
+    # ? or full exception traceback but pretty test output
+    def raise_value_error(err_msg):
+        # raise SystemExit(err_msg)
+        raise argparse.ArgumentTypeError(err_msg)
+
+    argument_parser.error = raise_value_error
 
     return argument_parser.parse_args(args)
 
@@ -160,7 +170,7 @@ def parse_url_parameters(args):
     params = {"rt" if args.return_date else "ow": "", "lang": "en",
               "depdate": args.dep_date,
               "aptcode1": args.dep_city, "rtdate": args.return_date,
-              "aptcode2": args.dest_city, "paxcount": args.adults_children}
+              "aptcode2": args.dest_city, "paxcount": args.persons}
 
     if not args.return_date:
         del params["rtdate"]
@@ -173,14 +183,18 @@ def print_flights_information(flights_info):
 
     # Table header
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
-        ".format("Direction", *flights_info["Going Out"].keys()))
+        ".format("Direction", *flights_info["Outbound"].keys()))
     # Outbound flight
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
-        ".format("Going Out", *flights_info["Going Out"].values()))
+        ".format("Outbound", *flights_info["Outbound"].values()))
     # Inbound flight
-    if flights_info["Coming back"]["Date"]:
+    if flights_info["Inbound"]["Date"]:
+        total_cost = int(flights_info["Outbound"]["Price"][:-7])\
+            + int(flights_info["Inbound"]["Price"][:-7])
+
         print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
-            ".format("Coming back", *flights_info["Coming back"].values()))
+            ".format("Inbound", *flights_info["Inbound"].values()))
+        print("{:<12} {:<10}".format("Total cost", f"{total_cost}.00 EUR"))
 
 
 def validate_city_code(code):
@@ -203,34 +217,47 @@ def validate_date(flight_date):
     Return valid date.
     """
 
-    parsed_dates = datetime.datetime.strptime(
+    parsed_date = datetime.datetime.strptime(
         flight_date, "%d.%m.%Y")
 
-    if datetime.datetime.today() > parsed_dates:
+    if datetime.datetime.today() > parsed_date:
         raise ValueError("Date in the past")
 
-    return flight_date
+    return parsed_date.strftime("%d.%m.%Y")
 
 
-def write_flight_information(flights_data, route_info, extra_route_info):
+def validate_persons(persons):
+    """ """
+
+    if not 0 < int(persons) < 10:
+        raise argparse.ArgumentTypeError("Invalid persons number. "
+                                         "Max persons number: 9")
+
+    # return int(persons)
+    return persons
+
+
+def write_flight_information(flights_data, route_info, extra_route_info,
+                             persons):
     """Write flight information to flights_data data structure (dict).
 
     Keyword arguments:
         flights_data -- dictionary with ready to print flights information.
         route_info -- main information about current route.
         extra_route_info -- price and additional information about route.
+        persons -- total number of adults and children.
     """
 
-    # TODO: rename i or get rid of it
     i = 1
+
     for key in flights_data:
         if key == "Flight duration":
             flights_data[key] = calculate_flight_duration(
                 route_info[2], route_info[3])
-        # Price is displayed per person
         elif key == "Price" and extra_route_info[0]:
-            # table[row+1][1].text[0:9] = "Price = "
-            flights_data[key] = extra_route_info[0]
+            # extra_route_info[0][-6:] contains currency
+            total_cost = int(extra_route_info[0][:-7]) * int(persons)
+            flights_data[key] = f"{total_cost}.00 EUR"
         # Row+1 also contains additional information (eg. NO_LUGGAGE_INCLUDED)
         elif key == "Additional information" and extra_route_info[1]:
             flights_data[key] = extra_route_info[1]
