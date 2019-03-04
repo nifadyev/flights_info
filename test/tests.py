@@ -2,6 +2,7 @@ import unittest
 import argparse
 import itertools
 import requests
+import datetime
 import src.script as source
 
 # TODO: Add docstring to each method
@@ -143,12 +144,6 @@ class TestValidatePersons(unittest.TestCase):
                 with self.assertRaises(argparse.ArgumentTypeError):
                     source.validate_persons(persons)
 
-    def test_invalid_type_float(self):
-        for persons in range(-100, 100):
-            with self.subTest(persons):
-                with self.assertRaises(ValueError):
-                    source.validate_persons(str(persons * 0.1))
-
 
 class TestCalculateFlightDuration(unittest.TestCase):
     """ """
@@ -222,13 +217,12 @@ class TestCheckRoute(unittest.TestCase):
     def test_all_available_dates(self):
         for route in self.dates:
             for date in self.dates[route]:
-                args = argparse.Namespace(dep_city=route[0], dest_city=route[1],
-                                          dep_date=date,
-                                          persons="2",
-                                          return_date=None)
                 with self.subTest(date):
                     try:
-                        source.check_route(args)
+                        parsed_date = datetime.datetime.strptime(date,
+                                                                 "%d.%m.%Y")
+                        source.check_route(route[0], route[1],
+                                           parsed_date, None)
                     except BaseException:
                         self.fail("check_route raised error unexpectedly!")
 
@@ -332,10 +326,10 @@ class TestCheckRoute(unittest.TestCase):
     # def test_check_date(self):
     #     with self.assertRaises(ValueError) as e:
     #         source.parse_arguments(["CPH", "PDV", "26.06.2019", "1"])
-
-
     #     # e.exception.args[0] contains error message
     #     self.assertEqual(e.exception.args[0],
     #                      "Flight route CPH-PDV is unavailable")
+
+
 if __name__ == '__main__':
     unittest.main()
