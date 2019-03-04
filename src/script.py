@@ -7,6 +7,18 @@ import requests
 # TODO: find it in prev commits (case: persons= -2)
 # TODO: define custom exception (optional)
 
+# All available routes and dates
+DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
+                          "17.07.2019", "24.07.2019", "31.07.2019",
+                          "07.08.2019"},
+         ("BOJ", "CPH"): {"27.06.2019", "04.07.2019", "11.07.2019",
+                          "18.07.2019", "25.07.2019", "01.08.2019",
+                          "08.08.2019"},
+         ("BOJ", "BLL"): {"01.07.2019", "08.07.2019", "15.07.2019",
+                          "22.07.2019", "29.07.2019", "05.08.2019"},
+         ("BLL", "BOJ"): {"01.07.2019", "08.07.2019", "15.07.2019",
+                          "22.07.2019", "29.07.2019", "05.08.2019"}}
+
 
 def calculate_flight_duration(departure_time, arrival_time):
     """Return flight duration in format hh:mm."""
@@ -24,48 +36,22 @@ def calculate_flight_duration(departure_time, arrival_time):
     return f"{formatted_hours}:{formatted_minutes}"
 
 
-# All available routes and dates
-DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
-                          "17.07.2019", "24.07.2019", "31.07.2019",
-                          "07.08.2019"},
-         ("BOJ", "CPH"): {"27.06.2019", "04.07.2019", "11.07.2019",
-                          "18.07.2019", "25.07.2019", "01.08.2019",
-                          "08.08.2019"},
-         ("BOJ", "BLL"): {"01.07.2019", "08.07.2019", "15.07.2019",
-                          "22.07.2019", "29.07.2019", "05.08.2019"},
-         ("BLL", "BOJ"): {"01.07.2019", "08.07.2019", "15.07.2019",
-                          "22.07.2019", "29.07.2019", "05.08.2019"}}
-
-
-def check_route(args):
+def check_route(dep_city, dest_city, dep_date, return_date):
     """Check current route for availability.
 
     Raise KeyError if route is not in DATES.
     Raise ValueError if departure date is in the past.
     """
-    # TODO: change args to dep_city, dest_city, dep_date, arr_date
-    # TODO: amnd call it twice in flights info
-    if args.return_date\
-        and datetime.datetime.strptime(args.dep_date, "%d.%m.%Y")\
-            > datetime.datetime.strptime(args.return_date, "%d.%m.%Y"):
 
-        raise ValueError("Departure date is in the past"
-                         "in comparison with return date")
+    if return_date:  # is not None:
+        if return_date > dep_date:
+            raise ValueError("Departure date is in the past"
+                             "in comparison with return date")
 
-    if (args.dep_city, args.dest_city) not in DATES:
+    if (dep_city, dest_city) not in DATES:
         raise KeyError("Unavailable route")
 
-    # ? whats better: 3 if statements or 1 if but 8 lines of code
-    if args.return_date:
-        departure_city = args.dest_city
-        destination_city = args.dep_city
-        date = args.return_date
-    else:
-        departure_city = args.dep_city
-        destination_city = args.dest_city
-        date = args.dep_date
-
-    if date not in DATES[(departure_city, destination_city)]:
+    if dep_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
         raise KeyError("No available flights for chosen dates")
 
 
@@ -76,15 +62,19 @@ def find_flight_info(arguments):
     """
 
     args = parse_arguments(arguments)
-    check_route(args)
-    request = requests.get("https://apps.penguin.bg/fly/quote3.aspx?",
+    check_route(args.dep_city, args.dest_city, args.dep_date, None)
+    if args.return_date:
+        # check_route(args.dep_city, args.dest.city,
+                    # args.dep_date, args.return_date)
+        check_route(args.dest_city, args.dep_city,
+                    args.return_date, args.dep_date)
+    request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
 
-    if request.text:
+    try:
         tree = lxml.etree.HTML(request.text)
-    else:
-        # TODO: probably change error type
-        raise ValueError("Request body is empty")
+    except ValueError:
+        pass
 
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
@@ -114,11 +104,8 @@ def find_flight_info(arguments):
             continue
 
         # row[1].text[:6] contains weekday
-        # TODO: change to commented variant
-        # flight_date = datetime.datetime.strptime(
-        #     row[1].text[5:], "%d %b %y")
         flight_date = datetime.datetime.strptime(
-            row[1].text[5:], "%d %b %y").strftime("%d.%m.%Y")
+            row[1].text[5:], "%d %b %y")
 
         # row[4:5].text contains city name and city code => in
         if flight_date == args.dep_date\
@@ -174,15 +161,17 @@ def parse_arguments(args):
 def parse_url_parameters(args):
     """Return valid url parameters for requests.get method."""
 
-    params = {"rt" if args.return_date else "ow": "", "lang": "en",
-              "depdate": args.dep_date,
-              "aptcode1": args.dep_city, "rtdate": args.return_date,
-              "aptcode2": args.dest_city, "paxcount": args.persons}
-
-    if not args.return_date:
-        del params["rtdate"]
-
-    return params
+    if args.return_date:
+        return {"rt" if args.return_date else "ow": "", "lang": "en",
+                "depdate": args.dep_date.strftime("%d.%m.%Y"),
+                "aptcode1": args.dep_city,
+                "rtdate": args.return_date.strftime("%d.%m.%Y"),
+                "aptcode2": args.dest_city, "paxcount": args.persons}
+    else:
+        return {"rt" if args.return_date else "ow": "", "lang": "en",
+                "depdate": args.dep_date.strftime("%d.%m.%Y"),
+                "aptcode1": args.dep_city,
+                "aptcode2": args.dest_city, "paxcount": args.persons}
 
 
 def print_flights_information(flights_info):
@@ -230,9 +219,9 @@ def validate_date(flight_date):
     if datetime.datetime.today() > parsed_date:
         raise ValueError("Date in the past")
 
-    return parsed_date.strftime("%d.%m.%Y")
-    # TODO: change to commented variant
-    # return parsed_date
+    # return parsed_date.strftime("%d.%m.%Y")
+
+    return parsed_date
 
 
 def validate_persons(persons):
