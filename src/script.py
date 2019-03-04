@@ -3,9 +3,9 @@ import datetime
 import lxml.etree
 import requests
 
-# TODO: add persons arg validation
 # TODO: Handle cases where there is no flight info
 # TODO: find it in prev commits (case: persons= -2)
+# TODO: define custom exception (optional)
 
 
 def calculate_flight_duration(departure_time, arrival_time):
@@ -13,11 +13,15 @@ def calculate_flight_duration(departure_time, arrival_time):
 
     dep_time = datetime.datetime.strptime(departure_time, "%H:%M")
     arr_time = datetime.datetime.strptime(arrival_time, "%H:%M")
-    duration = datetime.timedelta(hours=arr_time.hour - dep_time.hour,
-                                  minutes=arr_time.minute - dep_time.minute)
+    duration = datetime.timedelta(hours=arr_time.hour-dep_time.hour,
+                                  minutes=arr_time.minute-dep_time.minute)
 
-    # Remove seconds from output
-    return str(duration)[:-3]
+    hours = duration.seconds // 3600
+    minutes = (duration.seconds - hours * 3600) // 60
+    formatted_hours = hours if hours >= 10 else f"0{hours}"
+    formatted_minutes = minutes if minutes >= 10 else f"0{minutes}"
+
+    return f"{formatted_hours}:{formatted_minutes}"
 
 
 # All available routes and dates
@@ -39,7 +43,8 @@ def check_route(args):
     Raise KeyError if route is not in DATES.
     Raise ValueError if departure date is in the past.
     """
-
+    # TODO: change args to dep_city, dest_city, dep_date, arr_date
+    # TODO: amnd call it twice in flights info
     if args.return_date\
         and datetime.datetime.strptime(args.dep_date, "%d.%m.%Y")\
             > datetime.datetime.strptime(args.return_date, "%d.%m.%Y"):
@@ -85,6 +90,7 @@ def find_flight_info(arguments):
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
 
+    # TODO: handle this: simplify or move or write directly to func
     flights_data = {"Outbound": {"Date": "", "Departure": "",
                                  "Arrival": "", "Flight duration": "",
                                  "From": "", "To": "", "Price": "",
@@ -101,15 +107,16 @@ def find_flight_info(arguments):
             if len(row) == 3 and main_info:
                 extra_info = (row[1].text[8:] if row[1].text else "",
                               row[2].text if row[2].text else "")
-                write_flight_information(flights_data["Outbound"
-                                                      if outbound_flight
-                                                      else "Inbound"],
+                direction = "Outbound" if outbound_flight else "Inbound"
+                write_flight_information(flights_data[direction],
                                          main_info, extra_info, args.persons)
                 main_info = list()
             continue
 
-        # ? Could it be simplified
         # row[1].text[:6] contains weekday
+        # TODO: change to commented variant
+        # flight_date = datetime.datetime.strptime(
+        #     row[1].text[5:], "%d %b %y")
         flight_date = datetime.datetime.strptime(
             row[1].text[5:], "%d %b %y").strftime("%d.%m.%Y")
 
@@ -224,6 +231,8 @@ def validate_date(flight_date):
         raise ValueError("Date in the past")
 
     return parsed_date.strftime("%d.%m.%Y")
+    # TODO: change to commented variant
+    # return parsed_date
 
 
 def validate_persons(persons):
