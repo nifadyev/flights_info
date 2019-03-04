@@ -43,7 +43,7 @@ def check_route(dep_city, dest_city, dep_date, return_date):
     Raise ValueError if departure date is in the past.
     """
 
-    if return_date:  # is not None:
+    if return_date:
         if return_date > dep_date:
             raise ValueError("Departure date is in the past"
                              "in comparison with return date")
@@ -64,8 +64,6 @@ def find_flight_info(arguments):
     args = parse_arguments(arguments)
     check_route(args.dep_city, args.dest_city, args.dep_date, None)
     if args.return_date:
-        # check_route(args.dep_city, args.dest.city,
-                    # args.dep_date, args.return_date)
         check_route(args.dest_city, args.dep_city,
                     args.return_date, args.dep_date)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
@@ -95,6 +93,7 @@ def find_flight_info(arguments):
     for row in table:
         if 1 <= len(row) <= 3 or row[1].text == "Date":
             if len(row) == 3 and main_info:
+                # TODO: Write extra_info to flights_data or remove this fields
                 extra_info = (row[1].text[8:] if row[1].text else "",
                               row[2].text if row[2].text else "")
                 direction = "Outbound" if outbound_flight else "Inbound"
