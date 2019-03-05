@@ -3,10 +3,7 @@ import datetime
 import lxml.etree
 import requests
 
-# TODO: Handle cases where there is no flight info
-# TODO: find it in prev commits (case: persons= -2)
 # TODO: define custom exception (optional)
-# TODO: globally change docstrings to the one in write...
 
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
@@ -169,19 +166,38 @@ def parse_arguments(args):
 
 
 def parse_url_parameters(args):
-    """Return valid url parameters for requests.get method."""
+    """Create parameters for making get request.
 
-    if args.return_date:
-        return {"rt" if args.return_date else "ow": "", "lang": "en",
-                "depdate": args.dep_date.strftime("%d.%m.%Y"),
-                "aptcode1": args.dep_city,
-                "rtdate": args.return_date.strftime("%d.%m.%Y"),
-                "aptcode2": args.dest_city, "paxcount": args.persons}
-    else:
-        return {"rt" if args.return_date else "ow": "", "lang": "en",
-                "depdate": args.dep_date.strftime("%d.%m.%Y"),
-                "aptcode1": args.dep_city,
-                "aptcode2": args.dest_city, "paxcount": args.persons}
+    Arguments:
+        args {argparse.Namespace} -- flight parameters.
+
+    Returns:
+        dict -- valid url parameters.
+    """
+
+    # if args.return_date:
+    #     return {"rt": "", "lang": "en",
+    #             "depdate": args.dep_date.strftime("%d.%m.%Y"),
+    #             "aptcode1": args.dep_city,
+    #             "rtdate": args.return_date.strftime("%d.%m.%Y"),
+    #             "aptcode2": args.dest_city, "paxcount": args.persons}
+
+    # return {"ow": "", "lang": "en",
+    #         "depdate": args.dep_date.strftime("%d.%m.%Y"),
+    #         "aptcode1": args.dep_city,
+    #         "aptcode2": args.dest_city, "paxcount": args.persons}
+
+    parameters = {"rt" if args.return_date else "ow": "", "lang": "en",
+                  "depdate": args.dep_date.strftime("%d.%m.%Y"),
+                  "aptcode1": args.dep_city,
+                  "rtdate": args.return_date.strftime("%d.%m.%Y")
+                  if args.return_date else "",
+                  "aptcode2": args.dest_city, "paxcount": args.persons}
+
+    if not args.return_date:
+        del parameters["rtdate"]
+
+    return parameters
 
 
 def print_flights_information(flights_info):
