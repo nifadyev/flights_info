@@ -7,20 +7,16 @@ import src.script as source
 
 class TestProgram(unittest.TestCase):
     """ """
-
+    # TODO: remove such tests as below
+    # TODO: redo these tests to check return value
     def test_no_errors_with_correct_args_one_way(self):
         # expected_args = argparse.Namespace(dep_city="CPH",
         #                                    des_city="BOJ",
         #                                    dep_date="26.06.2019",
         #                                    persons="1")
         # TODO: Use argparse.Namespace as expected args => get rid of try catch
-        try:
-            source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"])
-        except BaseException:
-            self.fail("parse_arguments raised ValueError unexpectedly!")
+        source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"])
 
-        # self.assertEqual(source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"]),
-        #                  expected_args)
 
     def test_no_errors_with_correct_args_two_way(self):
         try:
