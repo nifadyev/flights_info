@@ -19,7 +19,6 @@ import src.script as source
 провалившихся тестов.
 """
 
-# TODO: cannot compare 2 argparse.Namespaces
 
 class TestProgram(unittest.TestCase):
     """ """
@@ -344,57 +343,104 @@ class TestFindFlightInfo(unittest.TestCase):
 
         self.assertEqual(source.find_flight_info(args), expected_data)
 
-    # TODO: probably this must be in parse_arguments case
-    def test_invalid_args(self):
+
+class TestParseArguments(unittest.TestCase):
+
+    # ! Working comparison of  2 argparse.Namespaces
+    def test_return_valid_args_one_way(self):
+        date = datetime.datetime.strptime("15.07.2019", "%d.%m.%Y")
+        args = ("BOJ", "BLL", "15.07.2019", "2")
+
+        expected_args = argparse.Namespace(dep_city="BOJ",
+                                           dest_city="BLL",
+                                           dep_date=date,
+                                           persons=2,
+                                           return_date=None)
+
+        self.assertEqual(source.parse_arguments(args), expected_args)
+
+    def test_return_valid_args_two_way(self):
+        date = datetime.datetime.strptime("31.07.2019", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("05.08.2019", "%d.%m.%Y")
+        args = ("CPH", "BOJ", "31.07.2019", "3", "-return_date=05.08.2019")
+
+        expected_args = argparse.Namespace(dep_city="CPH",
+                                           dest_city="BOJ",
+                                           dep_date=date,
+                                           persons=3,
+                                           return_date=return_date)
+
+        self.assertEqual(source.parse_arguments(args), expected_args)
+
+    def test_show_help_message(self):
+        with self.assertRaises(SystemExit):
+            source.parse_arguments(["-h"])
+
+    def test_invalid_dep_city(self):
+        args = ("123", "BOJ", "01.07.2019", "2")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_dest_city(self):
         args = ("CPH", "B0J", "01.07.2019", "3")
 
         with self.assertRaises(argparse.ArgumentTypeError):
-            source.find_flight_info(args)
+            source.parse_arguments(args)
+
+    def test_invalid_dep_date(self):
+        args = ("CPH", "BOJ", "01.02.2019", "1")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_persons(self):
+        args = ("BLL", "BOJ", "01.09.2019", "0")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_return_date1(self):
+        args = ("BLL", "BOJ", "01.09.2019", "1", "-return-date=13.10.2019")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_return_date2(self):
+        args = ("BLL", "BOJ", "01.09.2019", "1", "return_date=13.10.2019")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_return_date3(self):
+        args = ("BLL", "BOJ", "01.09.2019", "1", "13.10.2019")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
+
+    def test_invalid_return_date4(self):
+        args = ("BLL", "BOJ", "10.06.2019", "1", "-return_date=22/08/2019")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.parse_arguments(args)
 
     def test_too_many_args(self):
         args = ("CPH", "B0J", "01.07.2019", "3",
                 "-return_date=03.08.2019", "0")
 
         with self.assertRaises(argparse.ArgumentTypeError):
-            source.find_flight_info(args)
+            source.parse_arguments(args)
 
     def test_too_little_args(self):
         args = ("CPH", "B0J", "01.07.2019")
 
         with self.assertRaises(argparse.ArgumentTypeError):
-            source.find_flight_info(args)
+            source.parse_arguments(args)
+
     def test_no_args(self):
         with self.assertRaises(argparse.ArgumentTypeError):
-            source.find_flight_info(list())
+            source.parse_arguments(list())
 
-    def test_invalid_route(self):
-        args = ("CPH", "VAR", "22.06.2019", "1")
-
-        with self.assertRaises(KeyError):
-            source.find_flight_info(args)
-
-    def test_unavailable_route(self):
-        args = ("CPH", "VAR", "22.06.2019", "1")
-
-        with self.assertRaises(KeyError):
-            source.find_flight_info(args)
-
-    def test_unavailable_date(self):
-        args = ("BLL", "BOJ", "29.09.2019", "4")
-
-        with self.assertRaises(KeyError):
-            source.find_flight_info(args)
-
-# class TestParseArguments(unittest.TestCase):
-
-#     def test_return_valid_args(self):
-#         args = ("BOJ", "BLL", "15.07.2019", "2")
-
-
-
-# TODO: test too many args in terminal
-# TODO: test too many args in terminal
-# TODO: test invalid -return_date spelling
 
 
 if __name__ == '__main__':
