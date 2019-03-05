@@ -22,8 +22,13 @@ DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
 
 
 def calculate_flight_duration(departure_time, arrival_time):
-    """Return flight duration in format hh:mm."""
+    """Calculate flight duration.
 
+    Returns:
+        str -- flight duration in format hh:mm.
+    """
+
+    # Don't need to check args because its assumed that they're valid
     dep_time = datetime.datetime.strptime(departure_time, "%H:%M")
     arr_time = datetime.datetime.strptime(arrival_time, "%H:%M")
     duration = datetime.timedelta(hours=arr_time.hour-dep_time.hour,
@@ -38,16 +43,21 @@ def calculate_flight_duration(departure_time, arrival_time):
 
 
 def check_route(dep_city, dest_city, dep_date, return_date):
-    """Check current route for availability.
+    """Search route based of passed args in database. 
 
-    Raise KeyError if route is not in DATES.
-    Raise ValueError if departure date is in the past.
+    Raises:
+        ValueError -- departure date is in the past
+        KeyError -- unavailable route
+        KeyError -- no available flights for passed dates
     """
-
+    # ? leave as it is or call check_route(dep_city, dest_city, return_date, dep_date)
+    # ? in find_flight_info to remove duplicity but decrease tests readability
     if return_date:
-        if return_date > dep_date:
-            raise ValueError("Departure date is in the past"
+        if dep_date > return_date:
+            raise ValueError("Departure date is in the past "
                              "in comparison with return date")
+        if return_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
+            raise KeyError("No return for chosen dates")
 
     if (dep_city, dest_city) not in DATES:
         raise KeyError("Unavailable route")
@@ -66,7 +76,7 @@ def find_flight_info(arguments):
     check_route(args.dep_city, args.dest_city, args.dep_date, None)
     if args.return_date:
         check_route(args.dest_city, args.dep_city,
-                    args.return_date, args.dep_date)
+                    args.dep_date, args.return_date)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
 
@@ -218,7 +228,7 @@ def validate_persons(persons):
     try:
         valid_persons = int(persons)
     except ValueError:
-        pass
+        raise TypeError("Invalid type of persons. Must be digit (1-9).")
 
     if not 0 < valid_persons < 10:
         raise argparse.ArgumentTypeError("Invalid persons number. "
