@@ -1,23 +1,8 @@
 import unittest
 import argparse
 import itertools
-import requests
 import datetime
 import src.script as source
-
-# TODO: Add docstring to each method
-# TODO: use unittest.mock for parse_arguments
-
-"""
--b (--buffer) - вывод программы при провале теста будет показан, а не скрыт,
-как обычно.
--c (--catch) - Ctrl+C во время выполнения теста ожидает завершения текущего
-теста и затем сообщает результаты на данный момент. Второе нажатие Ctrl+C
-вызывает обычное исключение KeyboardInterrupt.
--f (--failfast) - выход после первого же неудачного теста.
---locals (начиная с Python 3.5) - показывать локальные переменные для
-провалившихся тестов.
-"""
 
 
 class TestProgram(unittest.TestCase):
@@ -454,7 +439,6 @@ class TestParseUrlParameters(unittest.TestCase):
 
         self.assertEqual(source.parse_url_parameters(args), expected_args)
 
-
     def test_return_valid_parameters_two_way(self):
         date = datetime.datetime.strptime("18.07.2019", "%d.%m.%Y")
         return_date = datetime.datetime.strptime("31.07.2019", "%d.%m.%Y")
@@ -467,6 +451,21 @@ class TestParseUrlParameters(unittest.TestCase):
                          "aptcode2": "CPH", "paxcount": 5}
 
         self.assertEqual(source.parse_url_parameters(args), expected_args)
+
+
+class TestWriteFlightInformation(unittest.TestCase):
+    def test_return_valid_flight_info(self):
+        args = (None, "Wed, 24 Jul 19", "02:45", "06:25", "Copenhagen (CPH)",
+                "Burgas (BOJ)", "145.00 EUR", "")
+
+        expected_args = {"Date": "Wed, 24 Jul 19", "Departure": "02:45",
+                         "Arrival": "06:25", "Flight duration": "03:40",
+                         "From": "Copenhagen (CPH)", "To": "Burgas (BOJ)",
+                         "Price": "435.00 EUR", "Additional information": ""}
+
+        self.assertEqual(source.write_flight_information(args, 3),
+                         expected_args)
+
 
 if __name__ == '__main__':
     unittest.main()
