@@ -19,6 +19,7 @@ import src.script as source
 провалившихся тестов.
 """
 
+# TODO: cannot compare 2 argparse.Namespaces
 
 class TestProgram(unittest.TestCase):
     """ """
@@ -260,7 +261,7 @@ class TestCheckRoute(unittest.TestCase):
         dep_date = datetime.datetime.strptime("01.07.2019", "%d.%m.%Y")
         return_date = datetime.datetime.strptime("05.09.2019", "%d.%m.%Y")
 
-        for dep_city, dest_city in itertools.permutations(self.city_codes, r = 2):
+        for dep_city, dest_city in itertools.permutations(self.city_codes, r=2):
             if (dest_city, dep_city) not in self.dates:
                 with self.subTest((dep_city, dest_city)):
                     with self.assertRaises(KeyError):
@@ -271,9 +272,9 @@ class TestCheckRoute(unittest.TestCase):
         for route in self.dates:
             for date in self.dates[route]:
                 with self.subTest(date):
-                    parsed_date=datetime.datetime.strptime(date,
+                    parsed_date = datetime.datetime.strptime(date,
                                                              "%d.%m.%Y")
-                    invalid_date=datetime.datetime(year = parsed_date.year-1,
+                    invalid_date = datetime.datetime(year=parsed_date.year-1,
                                                      month=parsed_date.month,
                                                      day=parsed_date.day)
                     with self.assertRaises(KeyError):
@@ -292,6 +293,108 @@ class TestCheckRoute(unittest.TestCase):
                     with self.assertRaises(KeyError):
                         source.check_route(route[0], route[1],
                                            parsed_date, invalid_date)
+
+
+class TestFindFlightInfo(unittest.TestCase):
+    # TODO: check if additional info is written and parsed
+    def test_with_valid_args_one_way(self):
+        args = ("BLL", "BOJ", "29.07.2019", "4")
+
+        try:
+            source.find_flight_info(args)
+        except BaseException:
+            self.fail("find_flight_info raised error unexpectedly!")
+
+    def test_with_valid_args_two_way(self):
+        args = ("BOJ", "BLL", "01.07.2019", "2", "-return_date=05.08.2019")
+
+        try:
+            source.find_flight_info(args)
+        except BaseException:
+            self.fail("find_flight_info raised error unexpectedly!")
+
+    def test_return_valid_data_one_way(self):
+        args = ("BLL", "BOJ", "22.07.2019", "7")
+        expected_data = {"Outbound": {"Date": "Mon, 22 Jul 19",
+                                      "Departure": "18:45", "Arrival": "22:45",
+                                      "Flight duration": "04:00",
+                                      "From": "Billund (BLL)",
+                                      "To": "Burgas (BOJ)",
+                                      "Price": "1204.00 EUR",
+                                      "Additional information": ""},
+                         "Inbound": 0}
+        self.assertEqual(source.find_flight_info(args), expected_data)
+
+    def test_return_valid_data_two_way(self):
+        args = ("BOJ", "BLL", "01.07.2019", "2", "-return_date=05.08.2019")
+        expected_data = {"Outbound": {"Date": "Mon, 1 Jul 19",
+                                      "Departure": "16:00", "Arrival": "17:50",
+                                      "Flight duration": "01:50",
+                                      "From": "Burgas (BOJ)",
+                                      "To": "Billund (BLL)",
+                                      "Price": "210.00 EUR",
+                                      "Additional information": ""},
+                         "Inbound": {"Date": "Mon, 5 Aug 19",
+                                     "Departure": "18:45", "Arrival": "22:45",
+                                     "Flight duration": "04:00",
+                                     "From": "Billund (BLL)",
+                                     "To": "Burgas (BOJ)",
+                                     "Price": "210.00 EUR",
+                                     "Additional information": ""}}
+
+        self.assertEqual(source.find_flight_info(args), expected_data)
+
+    # TODO: probably this must be in parse_arguments case
+    def test_invalid_args(self):
+        args = ("CPH", "B0J", "01.07.2019", "3")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.find_flight_info(args)
+
+    def test_too_many_args(self):
+        args = ("CPH", "B0J", "01.07.2019", "3",
+                "-return_date=03.08.2019", "0")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.find_flight_info(args)
+
+    def test_too_little_args(self):
+        args = ("CPH", "B0J", "01.07.2019")
+
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.find_flight_info(args)
+    def test_no_args(self):
+        with self.assertRaises(argparse.ArgumentTypeError):
+            source.find_flight_info(list())
+
+    def test_invalid_route(self):
+        args = ("CPH", "VAR", "22.06.2019", "1")
+
+        with self.assertRaises(KeyError):
+            source.find_flight_info(args)
+
+    def test_unavailable_route(self):
+        args = ("CPH", "VAR", "22.06.2019", "1")
+
+        with self.assertRaises(KeyError):
+            source.find_flight_info(args)
+
+    def test_unavailable_date(self):
+        args = ("BLL", "BOJ", "29.09.2019", "4")
+
+        with self.assertRaises(KeyError):
+            source.find_flight_info(args)
+
+# class TestParseArguments(unittest.TestCase):
+
+#     def test_return_valid_args(self):
+#         args = ("BOJ", "BLL", "15.07.2019", "2")
+
+
+
+# TODO: test too many args in terminal
+# TODO: test too many args in terminal
+# TODO: test invalid -return_date spelling
 
 
 if __name__ == '__main__':
