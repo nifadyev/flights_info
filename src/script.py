@@ -201,7 +201,11 @@ def parse_url_parameters(args):
 
 
 def print_flights_information(flights_info):
-    """Print information about flights."""
+    """Show information about flights.
+
+    Arguments:
+        flights_info {dict} -- parsed information about flights.
+    """
 
     # Table header
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
@@ -211,6 +215,7 @@ def print_flights_information(flights_info):
         ".format("Outbound", *flights_info["Outbound"].values()))
     # Inbound flight
     if flights_info["Inbound"]:
+        # Last 7 char of price contains currency
         total_cost = int(flights_info["Outbound"]["Price"][:-7])\
             + int(flights_info["Inbound"]["Price"][:-7])
 
@@ -220,9 +225,16 @@ def print_flights_information(flights_info):
 
 
 def validate_city_code(code):
-    """Raise ArgumentError if city code isn't in VALID_CITY_CODES.
+    """City code validator.
 
-    Return city code.
+    Arguments:
+        code {str} -- IATA city code.
+
+    Raises:
+        argparse.ArgumentTypeError -- code is not in VALID_CITY_CODES
+
+    Returns:
+        str -- valid city code.
     """
 
     VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
@@ -234,9 +246,16 @@ def validate_city_code(code):
 
 
 def validate_date(flight_date):
-    """Raise ValueError if date is invalid or in the past.
+    """Flight date validator.
 
-    Return valid date.
+    Arguments:
+        flight_date {str} -- date of flight.
+
+    Raises:
+        ValueError -- invalid date or date is in the past.
+
+    Returns:
+        datetime.datetime -- valid flight date.
     """
 
     parsed_date = datetime.datetime.strptime(
@@ -249,7 +268,19 @@ def validate_date(flight_date):
 
 
 def validate_persons(persons):
-    """ """
+    """Persons number validator.
+
+    Arguments:
+        persons {str} -- number of persons.
+
+    Raises:
+        TypeError -- cannot convert persons to int.
+        argparse.ArgumentTypeError -- invalid type or not 0 < persons < 10. 
+
+    Returns:
+        int -- valid persons number.
+    """
+
     try:
         valid_persons = int(persons)
     except ValueError:
@@ -283,11 +314,12 @@ def write_flight_information(raw_flight_info, persons):
         if key == "Flight duration":
             filled_flight_info[key] = calculate_flight_duration(
                 raw_flight_info[2], raw_flight_info[3])
+        # Element before last contains price
         elif key == "Price" and raw_flight_info[-2]:
             # extra_route_info[0][-6:] contains currency
             total_cost = int(raw_flight_info[-2][:-7]) * persons
             filled_flight_info[key] = f"{total_cost}.00 EUR"
-        # Row+1 also contains additional information (eg. NO_LUGGAGE_INCLUDED)
+        # Last element contains additional information (eg. NO_LUGGAGE_INCLUDED)
         elif key == "Additional information" and raw_flight_info[-1]:
             filled_flight_info[key] = raw_flight_info[-1]
         elif i < 6:
