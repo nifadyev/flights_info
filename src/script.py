@@ -130,10 +130,16 @@ def find_flight_info(arguments):
 
 
 def parse_arguments(args):
-    """Handle command line arguments.
+    """Handle command line arguments using argparse.
 
-    Raise ArgumentError if argument's type is incorrect.
-    Return valid arguments.
+    Arguments:
+        args {[type]} -- [description]
+
+    Raises:
+        argparse.ArgumentTypeError -- invalid argument type
+
+    Returns:
+        argparse.Namespace -- parsed arguments of valid type.
     """
 
     argument_parser = argparse.ArgumentParser(description="Flight informer")
@@ -147,7 +153,7 @@ def parse_arguments(args):
     argument_parser.add_argument("dep_date", help="departure flight date",
                                  type=validate_date)
     argument_parser.add_argument("persons",
-                                 help="Total number of persons",
+                                 help="total number of persons",
                                  type=validate_persons)
     argument_parser.add_argument("-return_date", help="return flight date",
                                  type=validate_date)
