@@ -67,9 +67,13 @@ def check_route(dep_city, dest_city, dep_date, return_date):
 
 
 def find_flight_info(arguments):
-    """Search for available flights.
+    """Handle arguments and search for available flights on flybulgarien.dk.
 
-    Return full available information about flights as dict.
+    Arguments:
+        arguments {list} -- command line arguments
+
+    Returns:
+        dict -- Available information about flights.
     """
 
     args = parse_arguments(arguments)
@@ -79,11 +83,13 @@ def find_flight_info(arguments):
                     args.dep_date, args.return_date)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
-
+    # TODO: handle An internal error occurred.
+    # TODO: Please retry your request. on site
+    # ? case for testing this try-except block
     try:
         tree = lxml.etree.HTML(request.text)
     except ValueError:
-        pass
+        raise ValueError("Request body is empty")
 
     table = tree.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
@@ -106,18 +112,15 @@ def find_flight_info(arguments):
             continue
 
         # row[1].text[:6] contains weekday
-        flight_date = datetime.datetime.strptime(
-            row[1].text[5:], "%d %b %y")
+        flight_date = datetime.datetime.strptime(row[1].text[5:], "%d %b %y")
 
         # row[4:5].text contains city name and city code => in
-        if flight_date == args.dep_date\
-                and args.dep_city in row[4].text\
+        if flight_date == args.dep_date and args.dep_city in row[4].text\
                 and args.dest_city in row[5].text:
 
             flight_info = [item.text for item in row]
             outbound_flight = True
-        elif flight_date == args.return_date\
-                and args.dest_city in row[4].text\
+        elif flight_date == args.return_date and args.dest_city in row[4].text\
                 and args.dep_city in row[5].text:
 
             flight_info = [item.text for item in row]
