@@ -24,11 +24,18 @@ class TestProgram(unittest.TestCase):
     """ """
 
     def test_no_errors_with_correct_args_one_way(self):
+        # expected_args = argparse.Namespace(dep_city="CPH",
+        #                                    des_city="BOJ",
+        #                                    dep_date="26.06.2019",
+        #                                    persons="1")
         # TODO: Use argparse.Namespace as expected args => get rid of try catch
         try:
             source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"])
         except BaseException:
             self.fail("parse_arguments raised ValueError unexpectedly!")
+
+        # self.assertEqual(source.parse_arguments(["CPH", "BOJ", "26.06.2019", "1"]),
+        #                  expected_args)
 
     def test_no_errors_with_correct_args_two_way(self):
         try:
@@ -117,16 +124,6 @@ class TestValidateCityCodes(unittest.TestCase):
 class TestValidatePersons(unittest.TestCase):
     """ """
 
-    # def test_valid_persons_number(self):
-    #     for persons in range(1, 10):
-    #         expected_args = argparse.Namespace(dep_city="BLL",
-    #                                            des_city="BOJ",
-    #                                            dep_date="04.07.2019",
-    #                                            persons=str(persons))
-    #         with self.subTest(persons):
-    #             self.assertEqual(expected_args, source.parse_arguments(
-    #                 ["BLL", "BOJ", "04.07.2019", str(persons)]))
-
     def test_valid_persons_number(self):
         for persons in range(1, 10):
             with self.subTest(persons):
@@ -143,6 +140,14 @@ class TestValidatePersons(unittest.TestCase):
             with self.subTest(persons):
                 with self.assertRaises(argparse.ArgumentTypeError):
                     source.validate_persons(persons)
+
+    def test_invalid_type1(self):
+        with self.assertRaises(TypeError):
+            source.validate_persons("g")
+
+    def test_invalid_type2(self):
+        with self.assertRaises(TypeError):
+            source.validate_persons("wasd")
 
 
 class TestCalculateFlightDuration(unittest.TestCase):
@@ -191,17 +196,12 @@ class TestCalculateFlightDuration(unittest.TestCase):
                     self.assertEqual(
                         source.calculate_flight_duration(time, time), "00:00")
 
-    def test_with_valid_args1(self):
-        # TODO: try to check all available combinations
-        # TODO: if it isn't too difficult
-        self.assertEqual(source.calculate_flight_duration(
-            "01:00", "01:01"), "00:01")
-
 
 class TestCheckRoute(unittest.TestCase):
     """ """
 
     def setUp(self):
+        self.city_codes = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
         self.dates = {
             ("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                              "17.07.2019", "24.07.2019", "31.07.2019",
@@ -214,7 +214,7 @@ class TestCheckRoute(unittest.TestCase):
             ("BLL", "BOJ"): {"01.07.2019", "08.07.2019", "15.07.2019",
                              "22.07.2019", "29.07.2019", "05.08.2019"}}
 
-    def test_all_available_dates(self):
+    def test_all_available_dates_one_way(self):
         for route in self.dates:
             for date in self.dates[route]:
                 with self.subTest(date):
@@ -226,109 +226,72 @@ class TestCheckRoute(unittest.TestCase):
                     except BaseException:
                         self.fail("check_route raised error unexpectedly!")
 
-    # def test_check_date_availability_correct_cph_to_boj_one_way(self):
-    # TODO: Use SetUp in this testCase (setup DATES from script.py)
-    #     CPH_TO_BOJ_DATES = {"26.06.2019", "03.07.2019", "10.07.2019",
-    #                         "17.07.2019", "24.07.2019", "31.07.2019",
-    #                         "07.08.2019"}
-    #     for date in CPH_TO_BOJ_DATES:
-    #         args = argparse.Namespace(dep_city="CPH", dest_city="BOJ",
-    #                                   dep_date=date,
-    #                                   adults_children="1",
-    #                                   return_date=None)
-    #         with self.subTest(date):
-    #             try:
-    #                 source.check_date_availability(args, False)
-    #             except ValueError:
-    #                 self.fail("check_date_availability raised"
-    #                           "ValueError unexpectedly!")
+    def test_dep_date_in_the_past1(self):
+        dep_date = datetime.datetime.strptime("21.07.2019", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("20.07.2019", "%d.%m.%Y")
 
-    # def test_check_date_availability_correct_cph_to_boj_two_way(self):
-    #     CPH_TO_BOJ_DATES = {"26.06.2019", "03.07.2019", "10.07.2019",
-    #                         "17.07.2019", "24.07.2019", "31.07.2019",
-    #                         "07.08.2019"}
-    #     BOJ_TO_CPH_DATES = {"27.06.2019", "04.07.2019", "11.07.2019",
-    #                         "18.07.2019", "25.07.2019", "01.08.2019",
-    #                         "08.08.2019"}
-    #     for dep_date in CPH_TO_BOJ_DATES:
-    #         for return_date in BOJ_TO_CPH_DATES:
-    #             args = argparse.Namespace(dep_city="CPH", dest_city="BOJ",
-    #                                       dep_date=dep_date,
-    #                                       adults_children="1",
-    #                                       return_date=return_date)
-    #             with self.subTest((dep_date, return_date)):
-    #                 try:
-    #                     source.check_date_availability(args, True)
-    #                 except ValueError:
-    #                     self.fail("check_date_availability raised"
-    #                               "ValueError unexpectedly!")
+        with self.assertRaises(ValueError):
+            source.check_route("BLL", "BOJ", dep_date, return_date)
 
-    # def test_check_date_availability_correct_boj_to_bll_one_way(self):
-    #     BOJ_TO_BLL_DATES = {"01.07.2019", "08.07.2019", "15.07.2019",
-    #                         "22.07.2019", "29.07.2019", "05.08.2019"}
+    def test_dep_date_in_the_past2(self):
+        dep_date = datetime.datetime.strptime("23.09.2019", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("01.04.2019", "%d.%m.%Y")
 
-    #     for date in BOJ_TO_BLL_DATES:
-    #         args = argparse.Namespace(dep_city="BOJ", dest_city="BLL",
-    #                                   dep_date=date,
-    #                                   adults_children="1",
-    #                                   return_date=None)
-    #         with self.subTest(date):
-    #             try:
-    #                 source.check_date_availability(args, False)
-    #             except ValueError:
-    #                 self.fail("check_date_availability raised"
-    #                           "ValueError unexpectedly!")
+        with self.assertRaises(ValueError):
+            source.check_route("CPH", "BOJ", dep_date, return_date)
 
-    # def test_check_date_availability_correct_boj_to_boj_two_way(self):
-    #     CPH_TO_BOJ_DATES = {"26.06.2019", "03.07.2019", "10.07.2019",
-    #                         "17.07.2019", "24.07.2019", "31.07.2019",
-    #                         "07.08.2019"}
-    #     BOJ_TO_CPH_DATES = {"27.06.2019", "04.07.2019", "11.07.2019",
-    #                         "18.07.2019", "25.07.2019", "01.08.2019",
-    #                         "08.08.2019"}
-    #     for dep_date in CPH_TO_BOJ_DATES:
-    #         for return_date in BOJ_TO_CPH_DATES:
-    #             args = argparse.Namespace(dep_city="CPH", dest_city="BOJ",
-    #                                       dep_date=dep_date,
-    #                                       adults_children="1",
-    #                                       return_date=return_date)
-    #             with self.subTest((dep_date, return_date)):
-    #                 try:
-    #                     source.check_date_availability(args, True)
-    #                 except ValueError:
-    #                     self.fail("check_date_availability raised"
-    #                               "ValueError unexpectedly!")
+    def test_dep_date_in_the_past3(self):
+        dep_date = datetime.datetime.strptime("14.08.2020", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("14.08.2019", "%d.%m.%Y")
+        with self.assertRaises(ValueError):
+            source.check_route("BOJ", "BLL", dep_date, return_date)
 
-    # def test_check_all_unavailable_routes(self):
-    #         # args = ["PDV", "BOJ", "26.06.2019", "1"]
-    #     AVAILABLE_ROUTES = (("CPH", "BOJ"), ("BLL", "BOJ"), ("BOJ", "CPH"),
-    #                         ("BOJ", "BLL"))
-    #     CITY_CODES = ("CPH", "BLL", "PDV", "BOJ", "SOF", "VAR")
+    def test_unavailable_routes_outbound(self):
+        dep_date = datetime.datetime.strptime("21.06.2019", "%d.%m.%Y")
 
-    #     for dep_city, dest_city in itertools.permutations(CITY_CODES, r=2):
-    #         if (dep_city, dest_city) not in AVAILABLE_ROUTES:
-    #             with self.subTest((dep_city, dest_city)):
-    #                 with self.assertRaises(ValueError) as e:
-    #                     source.check_route(
-    #                         f"{dep_city}", f"{dest_city}")
-    #                 self.assertEqual(
-    #                     e.exception.args[0], f"Unavailable route")
+        for dep_city, dest_city in itertools.permutations(self.city_codes, r=2):
+            if (dep_city, dest_city) not in self.dates:
+                with self.subTest((dep_city, dest_city)):
+                    with self.assertRaises(KeyError):
+                        source.check_route(
+                            dep_city, dest_city, dep_date, None)
 
-    # def test_parse_arguments(self):
-    #     """ """
-    #     args = argparse.Namespace(adults_children='1', dep_city='CPH',
-    #                               dep_date='26.06.2019', dest_city='BOJ',
-    #                               return_date=None)
-    #     input_args = ["CPH", "BOJ", "26.06.2019", "1"]
+    def test_unavailable_routes_inbound(self):
+        dep_date = datetime.datetime.strptime("01.07.2019", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("05.09.2019", "%d.%m.%Y")
 
-    #     self.assertEqual(source.parse_arguments(input_args), args)
+        for dep_city, dest_city in itertools.permutations(self.city_codes, r = 2):
+            if (dest_city, dep_city) not in self.dates:
+                with self.subTest((dep_city, dest_city)):
+                    with self.assertRaises(KeyError):
+                        source.check_route(
+                            dest_city, dep_city, dep_date, return_date)
 
-    # def test_check_date(self):
-    #     with self.assertRaises(ValueError) as e:
-    #         source.parse_arguments(["CPH", "PDV", "26.06.2019", "1"])
-    #     # e.exception.args[0] contains error message
-    #     self.assertEqual(e.exception.args[0],
-    #                      "Flight route CPH-PDV is unavailable")
+    def test_unavailable_departure_dates(self):
+        for route in self.dates:
+            for date in self.dates[route]:
+                with self.subTest(date):
+                    parsed_date=datetime.datetime.strptime(date,
+                                                             "%d.%m.%Y")
+                    invalid_date=datetime.datetime(year = parsed_date.year-1,
+                                                     month=parsed_date.month,
+                                                     day=parsed_date.day)
+                    with self.assertRaises(KeyError):
+                        source.check_route(route[0], route[1],
+                                           invalid_date, None)
+
+    def test_unavailable_return_dates(self):
+        for route in self.dates:
+            for date in self.dates[route]:
+                with self.subTest(date):
+                    parsed_date = datetime.datetime.strptime(date,
+                                                             "%d.%m.%Y")
+                    invalid_date = datetime.datetime(year=parsed_date.year+1,
+                                                     month=parsed_date.month,
+                                                     day=parsed_date.day)
+                    with self.assertRaises(KeyError):
+                        source.check_route(route[0], route[1],
+                                           parsed_date, invalid_date)
 
 
 if __name__ == '__main__':
