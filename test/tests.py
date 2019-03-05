@@ -442,6 +442,31 @@ class TestParseArguments(unittest.TestCase):
             source.parse_arguments(list())
 
 
+class TestParseUrlParameters(unittest.TestCase):
+    def test_return_valid_parameters_one_way(self):
+        date = datetime.datetime.strptime("08.07.2019", "%d.%m.%Y")
+        args = argparse.Namespace(dep_city="BOJ", dest_city="BLL",
+                                  dep_date=date, persons=2,
+                                  return_date=None)
+
+        expected_args = {"ow": "", "lang": "en", "depdate": "08.07.2019",
+                         "aptcode1": "BOJ", "aptcode2": "BLL", "paxcount": 2}
+
+        self.assertEqual(source.parse_url_parameters(args), expected_args)
+
+
+    def test_return_valid_parameters_two_way(self):
+        date = datetime.datetime.strptime("18.07.2019", "%d.%m.%Y")
+        return_date = datetime.datetime.strptime("31.07.2019", "%d.%m.%Y")
+        args = argparse.Namespace(dep_city="BOJ", dest_city="CPH",
+                                  dep_date=date, persons=5,
+                                  return_date=return_date)
+
+        expected_args = {"rt": "", "lang": "en", "depdate": "18.07.2019",
+                         "aptcode1": "BOJ", "rtdate": "31.07.2019",
+                         "aptcode2": "CPH", "paxcount": 5}
+
+        self.assertEqual(source.parse_url_parameters(args), expected_args)
 
 if __name__ == '__main__':
     unittest.main()
