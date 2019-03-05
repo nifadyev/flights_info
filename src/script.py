@@ -3,7 +3,7 @@ import datetime
 import lxml.etree
 import requests
 
-# TODO: define custom exception (optional)
+# TODO: change output method from horizontal to vertical table
 
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
@@ -39,27 +39,29 @@ def calculate_flight_duration(departure_time, arrival_time):
     return f"{formatted_hours}:{formatted_minutes}"
 
 
-def check_route(dep_city, dest_city, dep_date, return_date):
-    """Search route based of passed args in database. 
+def check_route(dep_city, dest_city, flight_date, prev_flight_date):
+    """Search route based of passed args in database.
+
+    Arguments:
+        dep_city -- departure city.
+        dest_city -- destination city.
+        flight_date -- flight_date for route dep_city-dest_city
+        prev_flight_date -- past flight_date for route dest_city-dep_city
 
     Raises:
         ValueError -- departure date is in the past
         KeyError -- unavailable route
         KeyError -- no available flights for passed dates
     """
-    # ? leave as it is or call check_route(dep_city, dest_city, return_date, dep_date)
-    # ? in find_flight_info to remove duplicity but decrease tests readability
-    if return_date:
-        if dep_date > return_date:
-            raise ValueError("Departure date is in the past "
-                             "in comparison with return date")
-        if return_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
-            raise KeyError("No return for chosen dates")
+
+    if prev_flight_date and prev_flight_date > flight_date:
+        raise ValueError("Departure date is in the past "
+                         "in comparison with return date")
 
     if (dep_city, dest_city) not in DATES:
         raise KeyError("Unavailable route")
 
-    if dep_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
+    if flight_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
         raise KeyError("No available flights for chosen dates")
 
 
@@ -77,7 +79,7 @@ def find_flight_info(arguments):
     check_route(args.dep_city, args.dest_city, args.dep_date, None)
     if args.return_date:
         check_route(args.dest_city, args.dep_city,
-                    args.dep_date, args.return_date)
+                    args.return_date, args.dep_date)
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
     # TODO: handle An internal error occurred.
@@ -175,18 +177,6 @@ def parse_url_parameters(args):
         dict -- valid url parameters.
     """
 
-    # if args.return_date:
-    #     return {"rt": "", "lang": "en",
-    #             "depdate": args.dep_date.strftime("%d.%m.%Y"),
-    #             "aptcode1": args.dep_city,
-    #             "rtdate": args.return_date.strftime("%d.%m.%Y"),
-    #             "aptcode2": args.dest_city, "paxcount": args.persons}
-
-    # return {"ow": "", "lang": "en",
-    #         "depdate": args.dep_date.strftime("%d.%m.%Y"),
-    #         "aptcode1": args.dep_city,
-    #         "aptcode2": args.dest_city, "paxcount": args.persons}
-
     parameters = {"rt" if args.return_date else "ow": "", "lang": "en",
                   "depdate": args.dep_date.strftime("%d.%m.%Y"),
                   "aptcode1": args.dep_city,
@@ -275,7 +265,7 @@ def validate_persons(persons):
 
     Raises:
         TypeError -- cannot convert persons to int.
-        argparse.ArgumentTypeError -- invalid type or not 0 < persons < 10. 
+        argparse.ArgumentTypeError -- invalid type or not 0 < persons < 10.
 
     Returns:
         int -- valid persons number.
@@ -319,7 +309,7 @@ def write_flight_information(raw_flight_info, persons):
             # extra_route_info[0][-6:] contains currency
             total_cost = int(raw_flight_info[-2][:-7]) * persons
             filled_flight_info[key] = f"{total_cost}.00 EUR"
-        # Last element contains additional information (eg. NO_LUGGAGE_INCLUDED)
+        # Last elemcontains additional information (eg. NO_LUGGAGE_INCLUDED)
         elif key == "Additional information" and raw_flight_info[-1]:
             filled_flight_info[key] = raw_flight_info[-1]
         elif i < 6:
