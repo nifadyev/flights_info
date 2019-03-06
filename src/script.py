@@ -1,10 +1,27 @@
 import argparse
 import datetime
-import lxml.etree
+import lxml.html
 import requests
 
 # TODO: change output method from horizontal to vertical table
+# TODO: change max persons to 8
+# class Networkerror(RuntimeError):
+#    def __init__(self, arg):
+#       self.args = arg
 
+# try:
+#    raise Networkerror("Bad hostname")
+# except Networkerror,e:
+#    print e.args
+
+# TODO: добавить ключ -v в параметры, где будет verbose вывод ошибок. 
+# в таком случае можно тут вывести request.text например, 
+# для удобного дебага, или текст пойманного исключения
+# except ValueError as e:
+#     msg = 'Could not parse response body. '
+#     if '-v' in args:
+#         msg += request.text  # тот случай, когда += мб оправдан
+#     raise ValueError(msg)
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "17.07.2019", "24.07.2019", "31.07.2019",
@@ -25,7 +42,6 @@ def calculate_flight_duration(departure_time, arrival_time):
         str -- flight duration in format hh:mm.
     """
 
-    # Don't need to check args because its assumed that they're valid
     dep_time = datetime.datetime.strptime(departure_time, "%H:%M")
     arr_time = datetime.datetime.strptime(arrival_time, "%H:%M")
     duration = datetime.timedelta(hours=arr_time.hour-dep_time.hour,
@@ -36,6 +52,7 @@ def calculate_flight_duration(departure_time, arrival_time):
     formatted_hours = hours if hours >= 10 else f"0{hours}"
     formatted_minutes = minutes if minutes >= 10 else f"0{minutes}"
 
+    # TODO: possibly create datetime.time and return time.strftime
     return f"{formatted_hours}:{formatted_minutes}"
 
 
@@ -53,7 +70,8 @@ def check_route(dep_city, dest_city, flight_date, prev_flight_date):
         KeyError -- unavailable route
         KeyError -- no available flights for passed dates
     """
-
+    # TODO: move this to separate func and also add diff check
+    # between dep_date and return_date (more info in skype)
     if prev_flight_date and prev_flight_date > flight_date:
         raise ValueError("Departure date is in the past "
                          "in comparison with return date")
@@ -86,16 +104,19 @@ def find_flight_info(arguments):
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
-        tree = lxml.etree.HTML(request.text)
+        html = lxml.html.document_fromstring(request.text)
+        print(html)
     except ValueError:
-        raise ValueError("Request body is empty")
+        raise ValueError("Response body is empty")
 
-    table = tree.xpath(
+    table = html.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
 
-    flights_data = {"Outbound": 0, "Inbound": 0}
-
+    # flights_data = {"Outbound": 0, "Inbound": 0}
+    flights_data = dict()
+    flight_info = list()
+    # TODO: add useful comments for this cycle
     for row in table:
         if 1 <= len(row) <= 3 or row[1].text == "Date":
             if len(row) == 3 and flight_info:
@@ -171,6 +192,8 @@ def parse_arguments(args):
                                  type=validate_persons)
     argument_parser.add_argument("-return_date", help="return flight date",
                                  type=validate_date)
+    # TODO: add new optional arg verbose for verbose error output and traceback
+    # and without it just an error message
 
     # ? what's better: pretty error message by argparse but ugly test output
     # ? or full exception traceback but pretty test output
@@ -219,7 +242,8 @@ def print_flights_information(flights_info):
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
         ".format("Outbound", *flights_info["Outbound"].values()))
     # Inbound flight
-    if flights_info["Inbound"]:
+    # if flights_info["Inbound"]:
+    if "Inbound" in flights_info:
         # Last 7 char of price contains currency
         total_cost = int(flights_info["Outbound"]["Price"][:-7])\
             + int(flights_info["Inbound"]["Price"][:-7])
@@ -310,7 +334,7 @@ def write_flight_information(raw_flight_info, persons):
     Returns:
         dict -- parsed flight information.
     """
-
+    # TODO: use namedtupl   e instead of dict
     filled_flight_info = {"Date": "", "Departure": "",
                           "Arrival": "", "Flight duration": "",
                           "From": "", "To": "", "Price": "",
