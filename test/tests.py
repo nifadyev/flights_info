@@ -82,7 +82,7 @@ class TestValidateCityCodes(unittest.TestCase):
 class TestValidatePersons(unittest.TestCase):
 
     def test_valid_persons_number(self):
-        for persons in range(1, 10):
+        for persons in range(1, 9):
             with self.subTest(persons):
                 self.assertEqual(source.validate_persons(persons), persons)
 
@@ -93,7 +93,7 @@ class TestValidatePersons(unittest.TestCase):
                     source.validate_persons(persons)
 
     def test_too_big_persons_number(self):
-        for persons in range(10, 100):
+        for persons in range(9, 100):
             with self.subTest(persons):
                 with self.assertRaises(argparse.ArgumentTypeError):
                     source.validate_persons(persons)
