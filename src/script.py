@@ -2,9 +2,9 @@ import argparse
 import datetime
 import lxml.html
 import requests
+import sys
 
 # TODO: change output method from horizontal to vertical table
-# TODO: change max persons to 8
 # class Networkerror(RuntimeError):
 #    def __init__(self, arg):
 #       self.args = arg
@@ -14,8 +14,8 @@ import requests
 # except Networkerror,e:
 #    print e.args
 
-# TODO: добавить ключ -v в параметры, где будет verbose вывод ошибок. 
-# в таком случае можно тут вывести request.text например, 
+# TODO: добавить ключ -v в параметры, где будет verbose вывод ошибок.
+# в таком случае можно тут вывести request.text например,
 # для удобного дебага, или текст пойманного исключения
 # except ValueError as e:
 #     msg = 'Could not parse response body. '
@@ -56,25 +56,18 @@ def calculate_flight_duration(departure_time, arrival_time):
     return f"{formatted_hours}:{formatted_minutes}"
 
 
-def check_route(dep_city, dest_city, flight_date, prev_flight_date):
+def check_route(dep_city, dest_city, flight_date):
     """Search route based of passed args in database.
 
     Arguments:
         dep_city -- departure city.
         dest_city -- destination city.
         flight_date -- flight_date for route dep_city-dest_city
-        prev_flight_date -- past flight_date for route dest_city-dep_city
 
     Raises:
-        ValueError -- departure date is in the past
         KeyError -- unavailable route
         KeyError -- no available flights for passed dates
     """
-    # TODO: move this to separate func and also add diff check
-    # between dep_date and return_date (more info in skype)
-    if prev_flight_date and prev_flight_date > flight_date:
-        raise ValueError("Departure date is in the past "
-                         "in comparison with return date")
 
     if (dep_city, dest_city) not in DATES:
         raise KeyError("Unavailable route")
@@ -94,29 +87,44 @@ def find_flight_info(arguments):
     """
 
     args = parse_arguments(arguments)
-    check_route(args.dep_city, args.dest_city, args.dep_date, None)
+
+    check_route(args.dep_city, args.dest_city, args.dep_date)
     if args.return_date:
-        check_route(args.dest_city, args.dep_city,
-                    args.return_date, args.dep_date)
+        if args.dep_date > args.return_date:
+            raise ValueError("Departure date is in the past "
+                             "in comparison with return date")
+
+        check_route(args.dest_city, args.dep_city, args.return_date)
+
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
+    # print(request.text)
     # TODO: handle An internal error occurred.
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
         html = lxml.html.document_fromstring(request.text)
-        print(html)
+        # print(html)
     except ValueError:
+        # TODO: change message to more common
         raise ValueError("Response body is empty")
 
+    # TODO: create 3 xpath: common, with most info and with price
+    # This significantly increase readability
+    # root.findall('.//child/grandchild') - find all elems with art tabindex
     table = html.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
         "/tr/td/table[@id='flywiz_tblQuotes']/tr")
+    table_with_attrs = html.xpath(
+        "/html/body/form[@id='form1']/div/table[@id='flywiz']"
+        "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[@*]")
+    print(table_with_attrs)
 
     # flights_data = {"Outbound": 0, "Inbound": 0}
     flights_data = dict()
     flight_info = list()
     # TODO: add useful comments for this cycle
+    # TODO: use row.xpath(text()) or smth like that
     for row in table:
         if 1 <= len(row) <= 3 or row[1].text == "Date":
             if len(row) == 3 and flight_info:
@@ -198,11 +206,16 @@ def parse_arguments(args):
     # ? what's better: pretty error message by argparse but ugly test output
     # ? or full exception traceback but pretty test output
     def raise_value_error(err_msg):
-        raise argparse.ArgumentTypeError(err_msg)
+        # raise argparse.ArgumentTypeError(err_msg)
+        raise ValueError(err_msg)
 
     argument_parser.error = raise_value_error
-
-    return argument_parser.parse_args(args)
+    try:
+        return argument_parser.parse_args(args)
+    except:
+        print(sys.exc_info()[1])
+        sys.exit()
+        
 
 
 def parse_url_parameters(args):
@@ -317,9 +330,9 @@ def validate_persons(persons):
     except ValueError:
         raise TypeError("Invalid type of persons. Must be digit (1-9).")
 
-    if not 0 < valid_persons < 10:
+    if not 0 < valid_persons < 9:
         raise argparse.ArgumentTypeError("Invalid persons number. "
-                                         "Max persons number: 9")
+                                         "Max persons number: 8")
 
     return valid_persons
 
