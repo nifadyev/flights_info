@@ -127,6 +127,19 @@ def find_flight_info(arguments):
 
     return flights_data
 
+# def error(self, message):
+#     """error(message: string)
+
+#     Prints a usage message incorporating the message to stderr and
+#     exits.
+
+#     If you override this in a subclass, it should not return -- it
+#     should either exit or raise an exception.
+#     """
+#     self.print_usage(_sys.stderr)
+#     args = {'prog': self.prog, 'message': message}
+#     self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
+
 
 def parse_arguments(args):
     """Handle command line arguments using argparse.
@@ -149,6 +162,8 @@ def parse_arguments(args):
     argument_parser.add_argument("dest_city",
                                  help="destination city IATA code",
                                  type=validate_city_code)
+    # TODO: show list of available codes
+    # TODO: add helping tips for user
     argument_parser.add_argument("dep_date", help="departure flight date",
                                  type=validate_date)
     argument_parser.add_argument("persons",
@@ -230,7 +245,8 @@ def validate_city_code(code):
     VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
 
     if code not in VALID_CITY_CODES:
-        raise argparse.ArgumentTypeError("Invalid city code")
+        raise argparse.ArgumentTypeError("Invalid city code "
+                                         "Choose from this list: CPH, BLL, PDV, BOJ, SOF, VAR")
 
     return code
 
@@ -252,7 +268,8 @@ def validate_date(flight_date):
         flight_date, "%d.%m.%Y")
 
     if datetime.datetime.today() > parsed_date:
-        raise ValueError("Date in the past")
+        # raise ValueError("Date in the past")
+        raise argparse.ArgumentTypeError("Date in the past")
 
     return parsed_date
 
