@@ -234,9 +234,11 @@ class TestCheckRoute(unittest.TestCase):
                 with self.subTest(date):
                     parsed_date = datetime.datetime.strptime(date,
                                                              "%d.%m.%Y")
-                    invalid_date = datetime.datetime(year=parsed_date.year+1,
-                                                     month=parsed_date.month,
-                                                     day=parsed_date.day)
+                    # TODO: do this for each test
+                    # invalid_date = datetime.datetime(year=parsed_date.year+1,
+                    #                                  month=parsed_date.month,
+                    #                                  day=parsed_date.day)
+                    invalid_date = parsed_date.replace(year=2020)
                     with self.assertRaises(KeyError):
                         source.check_route(route[0], route[1],
                                            invalid_date, parsed_date)
