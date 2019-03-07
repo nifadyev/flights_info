@@ -274,7 +274,8 @@ class TestParseArguments(unittest.TestCase):
         date = datetime.datetime.strptime("15.07.2019", "%d.%m.%Y")
         expected_args = argparse.Namespace(dep_city="BOJ", dest_city="BLL",
                                            dep_date=date, persons=2,
-                                           return_date=None)
+                                           return_date=None,
+                                           verbose=False)
 
         self.assertEqual(source.parse_arguments(args), expected_args)
 
@@ -284,7 +285,8 @@ class TestParseArguments(unittest.TestCase):
         return_date = datetime.datetime.strptime("05.08.2019", "%d.%m.%Y")
         expected_args = argparse.Namespace(dep_city="CPH", dest_city="BOJ",
                                            dep_date=date, persons=3,
-                                           return_date=return_date)
+                                           return_date=return_date,
+                                           verbose=False)
 
         self.assertEqual(source.parse_arguments(args), expected_args)
 
