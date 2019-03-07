@@ -104,55 +104,44 @@ def find_flight_info(arguments):
     # ? case for testing this try-except block
     try:
         html = lxml.html.document_fromstring(request.text)
-        # print(html)
     except ValueError:
-        # TODO: change message to more common
-        raise ValueError("Response body is empty")
+        raise ValueError("Could not parse response, please try again. "
+                         "Use --verbose for more details.")
 
     # TODO: create 3 xpath: common, with most info and with price
     # This significantly increase readability
-    # root.findall('.//child/grandchild') - find all elems with art tabindex
+
     table = html.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        "/tr/td/table[@id='flywiz_tblQuotes']/tr")
-    table_with_attrs = html.xpath(
-        "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[@*]")
-    print(table_with_attrs)
+        "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[text()]")
 
-    # flights_data = {"Outbound": 0, "Inbound": 0}
+    i = 0
     flights_data = dict()
-    flight_info = list()
     # TODO: add useful comments for this cycle
-    # TODO: use row.xpath(text()) or smth like that
-    for row in table:
-        if 1 <= len(row) <= 3 or row[1].text == "Date":
-            if len(row) == 3 and flight_info:
-                # row[1].text[:9]="Price = "
-                flight_info.append(row[1].text[8:] if row[1].text else "")
-                flight_info.append(row[2].text if row[2].text else "")
-                direction = "Outbound" if outbound_flight else "Inbound"
+    # ? i <= len(table)
+    while i < len(table):
+        try:
+            flight_date = datetime.datetime.strptime(table[i].text,
+                                                     "%a, %d %b %y")
+        except:
+            raise ValueError("Could not correctly parse info from page. "
+                             "Cell does not contains date.")
 
-                flights_data[direction] = write_flight_information(
-                    flight_info, args.persons)
+        if flight_date == args.dep_date\
+                and args.dep_city in table[i+3].text\
+                and args.dest_city in table[i+4].text:
 
-                flight_info = None
-            continue
+            flight_info = [cell.text for cell in table[i:i+6]]
+            flights_data["Outbound"] = write_flight_information(flight_info,
+                                                                args.persons)
+        elif args.return_date and flight_date == args.return_date\
+                and args.dep_city in table[i+4].text\
+                and args.dest_city in table[i+3].text:
 
-        # row[1].text[:6] contains weekday
-        flight_date = datetime.datetime.strptime(row[1].text[5:], "%d %b %y")
-
-        # row[4:5].text contains city name and city code => in
-        if flight_date == args.dep_date and args.dep_city in row[4].text\
-                and args.dest_city in row[5].text:
-
-            flight_info = [item.text for item in row]
-            outbound_flight = True
-        elif flight_date == args.return_date and args.dest_city in row[4].text\
-                and args.dep_city in row[5].text:
-
-            flight_info = [item.text for item in row]
-            outbound_flight = False
+            flight_info = [cell.text for cell in table[i:i+6]]
+            flights_data["Inbound"] = write_flight_information(flight_info,
+                                                               args.persons)
+        i += 6
 
     return flights_data
 
@@ -203,8 +192,6 @@ def parse_arguments(args):
     # TODO: add new optional arg verbose for verbose error output and traceback
     # and without it just an error message
 
-    # ? what's better: pretty error message by argparse but ugly test output
-    # ? or full exception traceback but pretty test output
     def raise_value_error(err_msg):
         # raise argparse.ArgumentTypeError(err_msg)
         raise ValueError(err_msg)
@@ -215,7 +202,6 @@ def parse_arguments(args):
     except:
         print(sys.exc_info()[1])
         sys.exit()
-        
 
 
 def parse_url_parameters(args):
@@ -255,7 +241,6 @@ def print_flights_information(flights_info):
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
         ".format("Outbound", *flights_info["Outbound"].values()))
     # Inbound flight
-    # if flights_info["Inbound"]:
     if "Inbound" in flights_info:
         # Last 7 char of price contains currency
         total_cost = int(flights_info["Outbound"]["Price"][:-7])\
@@ -282,8 +267,9 @@ def validate_city_code(code):
     VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
 
     if code not in VALID_CITY_CODES:
-        raise argparse.ArgumentTypeError("Invalid city code "
-                                         "Choose from this list: CPH, BLL, PDV, BOJ, SOF, VAR")
+        raise argparse.ArgumentTypeError(
+            "Invalid city code. Choose from this list: CPH, BLL, "
+            "PDV, BOJ, SOF, VAR")
 
     return code
 
@@ -347,28 +333,28 @@ def write_flight_information(raw_flight_info, persons):
     Returns:
         dict -- parsed flight information.
     """
-    # TODO: use namedtupl   e instead of dict
+    # TODO: use namedtuple instead of dict
     filled_flight_info = {"Date": "", "Departure": "",
                           "Arrival": "", "Flight duration": "",
                           "From": "", "To": "", "Price": "",
                           "Additional information": ""}
-    i = 1
+    i = 0
 
     for key in filled_flight_info:
         if key == "Flight duration":
             filled_flight_info[key] = calculate_flight_duration(
-                raw_flight_info[2], raw_flight_info[3])
+                raw_flight_info[1], raw_flight_info[2])
         # Element before last contains price
-        elif key == "Price" and raw_flight_info[-2]:
-            # extra_route_info[0][-6:] contains currency
-            total_cost = int(raw_flight_info[-2][:-7]) * persons
+        # FIXME: wont work if there is additional info because -1 element
+        # would contain add info, not the price
+        elif key == "Price" and raw_flight_info[-1]:
+            # raw_flight_info[-1]="Price: xxx.00 EUR" => need only 7 - -7 elems
+            total_cost = int(raw_flight_info[-1][7:-7]) * persons
             filled_flight_info[key] = f"{total_cost}.00 EUR"
         # Last elemcontains additional information (eg. NO_LUGGAGE_INCLUDED)
-        elif key == "Additional information" and raw_flight_info[-1]:
-            filled_flight_info[key] = raw_flight_info[-1]
-        elif i < 6:
-            filled_flight_info[key] = raw_flight_info[i]\
-                if raw_flight_info[i] else ""
+        # i < 5 only fits for flights without additional info
+        elif i < 5:
+            filled_flight_info[key] = raw_flight_info[i]
             i += 1
 
     return filled_flight_info
