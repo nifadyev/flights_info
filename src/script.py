@@ -14,14 +14,7 @@ import sys
 # except Networkerror,e:
 #    print e.args
 
-# TODO: добавить ключ -v в параметры, где будет verbose вывод ошибок.
-# в таком случае можно тут вывести request.text например,
-# для удобного дебага, или текст пойманного исключения
-# except ValueError as e:
-#     msg = 'Could not parse response body. '
-#     if '-v' in args:
-#         msg += request.text  # тот случай, когда += мб оправдан
-#     raise ValueError(msg)
+
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "17.07.2019", "24.07.2019", "31.07.2019",
@@ -62,18 +55,21 @@ def check_route(dep_city, dest_city, flight_date):
     Arguments:
         dep_city -- departure city.
         dest_city -- destination city.
-        flight_date -- flight_date for route dep_city-dest_city
+        flight_date -- flight_date for route dep_city-dest_city.
 
     Raises:
-        KeyError -- unavailable route
-        KeyError -- no available flights for passed dates
+        KeyError -- unavailable route.
+        KeyError -- no available flights for passed dates.
     """
 
     if (dep_city, dest_city) not in DATES:
-        raise KeyError("Unavailable route")
+        available_routes = ",".join(f"({dep_city}, {dest_city})"
+                                    for dep_city, dest_city in DATES)
+        raise KeyError(f"Route not found. Available routes:{available_routes}")
 
     if flight_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
-        raise KeyError("No available flights for chosen dates")
+        message = "Flights for chosen dates not found. Available dates: "
+        raise KeyError(message + ", ".join(DATES[(dep_city, dest_city)]))
 
 
 def find_flight_info(arguments):
@@ -88,28 +84,35 @@ def find_flight_info(arguments):
 
     args = parse_arguments(arguments)
 
-    check_route(args.dep_city, args.dest_city, args.dep_date)
-    if args.return_date:
-        if args.dep_date > args.return_date:
-            raise ValueError("Departure date is in the past "
-                             "in comparison with return date")
+    try:
+        check_route(args.dep_city, args.dest_city, args.dep_date)
+        if args.return_date:
+            if args.dep_date > args.return_date:
+                raise ValueError("Departure date is in the past "
+                                 "in comparison with return date")
 
-        check_route(args.dest_city, args.dep_city, args.return_date)
+            check_route(args.dest_city, args.dep_city, args.return_date)
+    except KeyError as e:
+        if args.verbose:
+            raise e
+        else:
+            print(sys.exc_info()[1])
+            sys.exit()
 
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
                            params=parse_url_parameters(args))
-    # print(request.text)
+
     # TODO: handle An internal error occurred.
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
         html = lxml.html.document_fromstring(request.text)
     except ValueError:
-        raise ValueError("Could not parse response, please try again. "
-                         "Use --verbose for more details.")
-
-    # TODO: create 3 xpath: common, with most info and with price
-    # This significantly increase readability
+        message = "Could not parse response, please try again. "
+        if args.verbose:
+            raise ValueError(message + request.text)
+        else:
+            raise ValueError(message + "Use --verbose for more details.")
 
     table = html.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
@@ -118,19 +121,18 @@ def find_flight_info(arguments):
     i = 0
     flights_data = dict()
     # TODO: add useful comments for this cycle
-    # ? i <= len(table)
     while i < len(table):
         try:
             flight_date = datetime.datetime.strptime(table[i].text,
                                                      "%a, %d %b %y")
-        except:
-            raise ValueError("Could not correctly parse info from page. "
-                             "Cell does not contains date.")
+        except BaseException:
+            raise ValueError("Could not correctly parse flight date. "
+                             "Table does not contain date.")
 
-        if flight_date == args.dep_date\
-                and args.dep_city in table[i+3].text\
+        if flight_date == args.dep_date and args.dep_city in table[i+3].text\
                 and args.dest_city in table[i+4].text:
 
+            # i - i+6 table elements contain info about 1 flight
             flight_info = [cell.text for cell in table[i:i+6]]
             flights_data["Outbound"] = write_flight_information(flight_info,
                                                                 args.persons)
@@ -141,32 +143,20 @@ def find_flight_info(arguments):
             flight_info = [cell.text for cell in table[i:i+6]]
             flights_data["Inbound"] = write_flight_information(flight_info,
                                                                args.persons)
+
         i += 6
 
     return flights_data
-
-# def error(self, message):
-#     """error(message: string)
-
-#     Prints a usage message incorporating the message to stderr and
-#     exits.
-
-#     If you override this in a subclass, it should not return -- it
-#     should either exit or raise an exception.
-#     """
-#     self.print_usage(_sys.stderr)
-#     args = {'prog': self.prog, 'message': message}
-#     self.exit(2, _('%(prog)s: error: %(message)s\n') % args)
 
 
 def parse_arguments(args):
     """Handle command line arguments using argparse.
 
     Arguments:
-        args {[type]} -- [description]
+        args {list} -- command line arguments.
 
     Raises:
-        argparse.ArgumentTypeError -- invalid argument type
+        argparse.ArgumentTypeError -- invalid argument type.
 
     Returns:
         argparse.Namespace -- parsed arguments of valid type.
@@ -180,8 +170,6 @@ def parse_arguments(args):
     argument_parser.add_argument("dest_city",
                                  help="destination city IATA code",
                                  type=validate_city_code)
-    # TODO: show list of available codes
-    # TODO: add helping tips for user
     argument_parser.add_argument("dep_date", help="departure flight date",
                                  type=validate_date)
     argument_parser.add_argument("persons",
@@ -189,17 +177,18 @@ def parse_arguments(args):
                                  type=validate_persons)
     argument_parser.add_argument("-return_date", help="return flight date",
                                  type=validate_date)
-    # TODO: add new optional arg verbose for verbose error output and traceback
-    # and without it just an error message
+    argument_parser.add_argument("-v", "--verbose",
+                                 help="verbose output about errors",
+                                 action='store_true')
 
     def raise_value_error(err_msg):
-        # raise argparse.ArgumentTypeError(err_msg)
-        raise ValueError(err_msg)
+        raise argparse.ArgumentTypeError(err_msg)
 
     argument_parser.error = raise_value_error
+
     try:
         return argument_parser.parse_args(args)
-    except:
+    except BaseException:
         print(sys.exc_info()[1])
         sys.exit()
 
@@ -291,7 +280,6 @@ def validate_date(flight_date):
         flight_date, "%d.%m.%Y")
 
     if datetime.datetime.today() > parsed_date:
-        # raise ValueError("Date in the past")
         raise argparse.ArgumentTypeError("Date in the past")
 
     return parsed_date
@@ -305,7 +293,7 @@ def validate_persons(persons):
 
     Raises:
         TypeError -- cannot convert persons to int.
-        argparse.ArgumentTypeError -- invalid type or not 0 < persons < 10.
+        argparse.ArgumentTypeError -- invalid type or not 0 < persons < 9.
 
     Returns:
         int -- valid persons number.
@@ -314,7 +302,7 @@ def validate_persons(persons):
     try:
         valid_persons = int(persons)
     except ValueError:
-        raise TypeError("Invalid type of persons. Must be digit (1-9).")
+        raise TypeError("Invalid type of persons. Must be digit (1-8).")
 
     if not 0 < valid_persons < 9:
         raise argparse.ArgumentTypeError("Invalid persons number. "
@@ -333,28 +321,22 @@ def write_flight_information(raw_flight_info, persons):
     Returns:
         dict -- parsed flight information.
     """
-    # TODO: use namedtuple instead of dict
-    filled_flight_info = {"Date": "", "Departure": "",
-                          "Arrival": "", "Flight duration": "",
-                          "From": "", "To": "", "Price": "",
-                          "Additional information": ""}
-    i = 0
 
-    for key in filled_flight_info:
-        if key == "Flight duration":
-            filled_flight_info[key] = calculate_flight_duration(
-                raw_flight_info[1], raw_flight_info[2])
-        # Element before last contains price
-        # FIXME: wont work if there is additional info because -1 element
-        # would contain add info, not the price
-        elif key == "Price" and raw_flight_info[-1]:
-            # raw_flight_info[-1]="Price: xxx.00 EUR" => need only 7 - -7 elems
-            total_cost = int(raw_flight_info[-1][7:-7]) * persons
-            filled_flight_info[key] = f"{total_cost}.00 EUR"
-        # Last elemcontains additional information (eg. NO_LUGGAGE_INCLUDED)
-        # i < 5 only fits for flights without additional info
-        elif i < 5:
-            filled_flight_info[key] = raw_flight_info[i]
+    parsed_flight_info = {"Date": "", "Departure": "", "Arrival": "",
+                          "Flight duration": "", "From": "", "To": "",
+                          "Price": "", "Additional information": ""}
+
+    parsed_flight_info["Flight duration"] = calculate_flight_duration(
+        *raw_flight_info[1:3])
+    total_cost = int(raw_flight_info[-1][7:-7]) * persons
+    parsed_flight_info["Price"] = f"{total_cost}.00 EUR"
+
+    i = 0
+    # TODO: add additional information handling
+    for key in parsed_flight_info:
+        # ! i < 6 if there is additional information
+        if not parsed_flight_info[key] and i < 5:
+            parsed_flight_info[key] = raw_flight_info[i]
             i += 1
 
-    return filled_flight_info
+    return parsed_flight_info
