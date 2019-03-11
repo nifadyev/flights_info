@@ -1,6 +1,8 @@
 import argparse
 import datetime
 import lxml.html
+import lxml.etree
+import lxml.objectify
 import requests
 import sys
 
@@ -100,7 +102,7 @@ def find_flight_info(arguments):
             sys.exit()
 
     request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
-                           params=parse_url_parameters(args))
+                           params=create_url_parameters(args))
 
     # TODO: handle An internal error occurred.
     # TODO: Please retry your request. on site
@@ -113,13 +115,51 @@ def find_flight_info(arguments):
             raise ValueError(message + request.text)
         else:
             raise ValueError(message + "Use --verbose for more details.")
-
+    # TODO: take only table and do subrequests to it by another xpath
+    # ! how to differentiate rows with main info and row with price
+    # ! search in table for trs with tds contining input atr
+    # ! then save meta data about flight AND arg of onclick=selectedRow()
+    # ! then again search in table for  tr with saved arg to get price and add info
+    # table = html.xpath(
+    #     "/html/body/form[@id='form1']/div/table[@id='flywiz']"
+    #     "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[text()]")
     table = html.xpath(
         "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[text()]")
+        "/tr/td/table[@id='flywiz_tblQuotes']")
+    # mata_info = bar.xpath("/tr/td[@input]")
+    # print(meta_info)
 
+
+    # html_etree = lxml.objectify.
+    # table_etree = lxml.etree.parse(request.text)
+    table_list = html.xpath("/html/body/form[@id='form1']/div/table[@id='flywiz']"
+        "/tr/td/table[@id='flywiz_tblQuotes']")
+    # table_list = html.xpath("/html/body/form[@id='form1']/div/table[@id='flywiz']"
+    #     "/tr/td/table[@id='flywiz_tblQuotes']")[0]
+    print(type(table_list),type(table_list[0]), len(table_list))
+    # table_tree = lxml.etree.HTML(table_list)
+    # print(html.get_element_by_id("flywiz*"))
+    # ! valid solution but choose button is included
+    # temp = table_list[0].xpath("./tr[contains(@id,'rinf')]")
+    meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]/td[not(position()=1)]")
+    flight_ids = table_list[0].xpath("./tr[contains(@id,'rinf')]/@id")
+    print(type(str(flight_ids[0])))
+    outbound_price_and_extra_info = table_list[0].xpath(f"./tr[contains(@id,'{flight_ids[0][-5:]}') and not(contains(@id, 'rinf'))]")
+    # temp2 = temp[0].xpath("./td[text()]")
+    # print(request.text)
+    print(meta_info_about_flights)
+    print(flight_ids[0], flight_ids[0][-5:])
+    print(len(meta_info_about_flights))
+    for i in outbound_price_and_extra_info:
+        print(i[1].text)
+    print(len(outbound_price_and_extra_info))
+    # print(meta_info_about_flights[0][0].text)
+    # print(type(table_list))
+    # print(type(request.text))
+    sys.exit(0)
     i = 0
-    flights_data = dict()
+    # flights_data = dict()
+    flights_data = {}
     # TODO: add useful comments for this cycle
     while i < len(table):
         try:
@@ -193,7 +233,7 @@ def parse_arguments(args):
         sys.exit()
 
 
-def parse_url_parameters(args):
+def create_url_parameters(args):
     """Create parameters for making get request.
 
     Arguments:
@@ -202,18 +242,29 @@ def parse_url_parameters(args):
     Returns:
         dict -- valid url parameters.
     """
+    # TODO: get rid of 3 if statements
+    # parameters = {"rt" if args.return_date else "ow": "", "lang": "en",
+    #               "depdate": args.dep_date.strftime("%d.%m.%Y"),
+    #               "aptcode1": args.dep_city,
+    #               "rtdate": args.return_date.strftime("%d.%m.%Y")
+    #               if args.return_date else "",
+    #               "aptcode2": args.dest_city, "paxcount": args.persons}
 
-    parameters = {"rt" if args.return_date else "ow": "", "lang": "en",
-                  "depdate": args.dep_date.strftime("%d.%m.%Y"),
-                  "aptcode1": args.dep_city,
-                  "rtdate": args.return_date.strftime("%d.%m.%Y")
-                  if args.return_date else "",
-                  "aptcode2": args.dest_city, "paxcount": args.persons}
+    # if not args.return_date:
+    #     del parameters["rtdate"]
 
-    if not args.return_date:
-        del parameters["rtdate"]
+    # return parameters
+    if args.return_date:
+        return {"rt": "", "lang": "en",
+                "depdate": args.dep_date.strftime("%d.%m.%Y"),
+                "aptcode1": args.dep_city,
+                "rtdate": args.return_date.strftime("%d.%m.%Y"),
+                "aptcode2": args.dest_city, "paxcount": args.persons}
 
-    return parameters
+    return {"ow": "", "lang": "en",
+            "depdate": args.dep_date.strftime("%d.%m.%Y"),
+            "aptcode1": args.dep_city,
+            "aptcode2": args.dest_city, "paxcount": args.persons}
 
 
 def print_flights_information(flights_info):
@@ -321,7 +372,8 @@ def write_flight_information(raw_flight_info, persons):
     Returns:
         dict -- parsed flight information.
     """
-
+    # TODO: write to parsed_flight_info явно
+    # parsed_flight_info = {"Date": "bla-bla", etc
     parsed_flight_info = {"Date": "", "Departure": "", "Arrival": "",
                           "Flight duration": "", "From": "", "To": "",
                           "Price": "", "Additional information": ""}
