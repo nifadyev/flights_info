@@ -108,7 +108,8 @@ def find_flight_info(arguments):
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
-        html = lxml.html.document_fromstring(request.text)
+        # html = lxml.html.document_fromstring(request.text)
+        html = lxml.etree.HTML(request.text)
     except ValueError:
         message = "Could not parse response, please try again. "
         if args.verbose:
@@ -120,30 +121,30 @@ def find_flight_info(arguments):
     # ! search in table for trs with tds contining input atr
     # ! then save meta data about flight AND arg of onclick=selectedRow()
     # ! then again search in table for  tr with saved arg to get price and add info
+    table = html.xpath("//table[@id='flywiz_tblQuotes']/tr/td[text()]")
     # table = html.xpath(
     #     "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-    #     "/tr/td/table[@id='flywiz_tblQuotes']/tr/td[text()]")
-    table = html.xpath(
-        "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        "/tr/td/table[@id='flywiz_tblQuotes']")
-    # mata_info = bar.xpath("/tr/td[@input]")
-    # print(meta_info)
+    #     "/tr/td/table[@id='flywiz_tblQuotes']")
 
-
-    # html_etree = lxml.objectify.
-    # table_etree = lxml.etree.parse(request.text)
-    table_list = html.xpath("/html/body/form[@id='form1']/div/table[@id='flywiz']"
-        "/tr/td/table[@id='flywiz_tblQuotes']")
+    table_list = html.xpath("//table[@id='flywiz_tblQuotes']")
     # table_list = html.xpath("/html/body/form[@id='form1']/div/table[@id='flywiz']"
     #     "/tr/td/table[@id='flywiz_tblQuotes']")[0]
-    print(type(table_list),type(table_list[0]), len(table_list))
+    # print(type(table_list),type(table_list[0]), len(table_list))
     # table_tree = lxml.etree.HTML(table_list)
     # print(html.get_element_by_id("flywiz*"))
     # ! valid solution but choose button is included
     # temp = table_list[0].xpath("./tr[contains(@id,'rinf')]")
-    meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]/td[not(position()=1)]")
+    # meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]/td[not(position()=1)]")
+    meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]")
+    # Remove all info about radio button 
+    for row in meta_info_about_flights:
+        row.remove(row[0])
+
+        # print(row.xpath("./td/input")[0])
+    print(len(meta_info_about_flights[0]), meta_info_about_flights[0][0].text)
+    # flight_ids = meta_info_about_flights[0].xpath("../tr[contains(@id,'rinf')]/@id")
     flight_ids = table_list[0].xpath("./tr[contains(@id,'rinf')]/@id")
-    print(type(str(flight_ids[0])))
+    print(type(flight_ids[0]), len(flight_ids))
     outbound_price_and_extra_info = table_list[0].xpath(f"./tr[contains(@id,'{flight_ids[0][-5:]}') and not(contains(@id, 'rinf'))]")
     # temp2 = temp[0].xpath("./td[text()]")
     # print(request.text)
