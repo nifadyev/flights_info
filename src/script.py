@@ -1,8 +1,9 @@
 import argparse
 import datetime
+import sys
 import lxml.html
 import requests
-import sys
+import typing
 
 # TODO: change output method from horizontal to vertical table
 # TODO: (optional) add strict typization
@@ -20,7 +21,7 @@ DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "22.07.2019", "29.07.2019", "05.08.2019"}}
 
 
-def calculate_flight_duration(departure_time, arrival_time):
+def calculate_flight_duration(departure_time: str, arrival_time: str) -> str:
     """Calculate flight duration.
 
     Returns:
@@ -41,13 +42,8 @@ def calculate_flight_duration(departure_time, arrival_time):
     return f"{formatted_hours}:{formatted_minutes}"
 
 
-def check_route(dep_city, dest_city, flight_date):
+def check_route(dep_city: str, dest_city: str, flight_date: str) -> None:
     """Search route based of passed args in database.
-
-    Arguments:
-        dep_city -- departure city.
-        dest_city -- destination city.
-        flight_date -- flight_date for route dep_city-dest_city.
 
     Raises:
         KeyError -- unavailable route.
@@ -66,7 +62,7 @@ def check_route(dep_city, dest_city, flight_date):
         raise KeyError(message + ", ".join(DATES[(dep_city, dest_city)]))
 
 
-def find_flight_info(arguments):
+def find_flight_info(arguments: typing.List[str]) -> typing.Dict[str, dict]:
     """Handle arguments and search for available flights on flybulgarien.dk.
 
     Arguments:
@@ -161,7 +157,7 @@ def find_flight_info(arguments):
     return flights_data
 
 
-def parse_arguments(args):
+def parse_arguments(args: typing.List[str]) -> argparse.Namespace:
     """Handle command line arguments using argparse.
 
     Arguments:
@@ -193,7 +189,7 @@ def parse_arguments(args):
                                  help="verbose output about errors",
                                  action='store_true')
 
-    def raise_value_error(err_msg):
+    def raise_value_error(err_msg: str):
         raise argparse.ArgumentTypeError(err_msg)
 
     argument_parser.error = raise_value_error
@@ -205,7 +201,7 @@ def parse_arguments(args):
         sys.exit()
 
 
-def create_url_parameters(args):
+def create_url_parameters(args: str) -> typing.Dict[str, str]:
     """Create parameters for making get request.
 
     Arguments:
@@ -215,6 +211,7 @@ def create_url_parameters(args):
         dict -- valid url parameters.
     """
 
+    # ? namedtuple with asdict method
     if args.return_date:
         return {"rt": "", "lang": "en",
                 "depdate": args.dep_date.strftime("%d.%m.%Y"),
@@ -228,7 +225,7 @@ def create_url_parameters(args):
             "aptcode2": args.dest_city, "paxcount": args.persons}
 
 
-def print_flights_information(flights_info):
+def print_flights_information(flights_info: typing.Dict[str, dict]) -> None:
     """Show information about flights.
 
     Arguments:
@@ -252,7 +249,7 @@ def print_flights_information(flights_info):
         print("{:<12} {:<10}".format("Total cost", f"{total_cost}.00 EUR"))
 
 
-def validate_city_code(code):
+def validate_city_code(code: str) -> str:
     """City code validator.
 
     Arguments:
@@ -275,7 +272,7 @@ def validate_city_code(code):
     return code
 
 
-def validate_date(flight_date):
+def validate_date(flight_date: str) -> datetime.datetime:
     """Flight date validator.
 
     Arguments:
@@ -297,7 +294,7 @@ def validate_date(flight_date):
     return parsed_date
 
 
-def validate_persons(persons):
+def validate_persons(persons: str) -> int:
     """Persons number validator.
 
     Arguments:
@@ -323,7 +320,9 @@ def validate_persons(persons):
     return valid_persons
 
 
-def write_flight_information(meta_flight_info, price_and_extra_info, persons):
+def write_flight_information(meta_flight_info: typing.List[str],
+                             price_and_extra_info: typing.List[str],
+                             persons: int) -> typing.Dict[str, str]:
     """Parse flight information.
 
     Arguments:
@@ -338,10 +337,12 @@ def write_flight_information(meta_flight_info, price_and_extra_info, persons):
     # price_and_extra_info[0] contains extra "Price: " and "EUR"
     total_cost = int(price_and_extra_info[0][7:-7]) * persons
     flight_duration = calculate_flight_duration(*meta_flight_info[1:3])
-    # flight_duration = calculate_flight_duration(meta_flight_info[1], meta_flight_info[2])
+    # flight_duration = calculate_flight_duration(meta_flight_info[1],
+    #                                               meta_flight_info[2])
     extra_info = price_and_extra_info[1]if len(
         price_and_extra_info) > 1 else ""
 
+    # TODO: try namedtuple here
     return {
         "Date": meta_flight_info[0],
         "Departure": meta_flight_info[1],
