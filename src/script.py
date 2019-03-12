@@ -1,21 +1,11 @@
 import argparse
 import datetime
 import lxml.html
-import lxml.etree
-import lxml.objectify
 import requests
 import sys
 
 # TODO: change output method from horizontal to vertical table
-# class Networkerror(RuntimeError):
-#    def __init__(self, arg):
-#       self.args = arg
-
-# try:
-#    raise Networkerror("Bad hostname")
-# except Networkerror,e:
-#    print e.args
-
+# TODO: (optional) add strict typization
 
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
@@ -67,10 +57,12 @@ def check_route(dep_city, dest_city, flight_date):
     if (dep_city, dest_city) not in DATES:
         available_routes = ",".join(f"({dep_city}, {dest_city})"
                                     for dep_city, dest_city in DATES)
+
         raise KeyError(f"Route not found. Available routes:{available_routes}")
 
     if flight_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
         message = "Flights for chosen dates not found. Available dates: "
+
         raise KeyError(message + ", ".join(DATES[(dep_city, dest_city)]))
 
 
@@ -108,8 +100,7 @@ def find_flight_info(arguments):
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
-        # html = lxml.html.document_fromstring(request.text)
-        html = lxml.etree.HTML(request.text)
+        html = lxml.html.document_fromstring(request.text)
     except ValueError:
         message = "Could not parse response, please try again. "
         if args.verbose:
@@ -117,51 +108,55 @@ def find_flight_info(arguments):
         else:
             raise ValueError(message + "Use --verbose for more details.")
 
-    # TODO: take only table and do subrequests to it by another xpath
-    # ! how to differentiate rows with main info and row with price
-    # ! search in table for trs with tds contining input atr
-    # ! then save meta data about flight AND arg of onclick=selectedRow()
-    # ! then again search in table for  tr with saved arg to get price and add info
-
-    # table = html.xpath("//table[@id='flywiz_tblQuotes']/tr/td[text()]")
+    # 0 element contains tbody => full table
     table = html.xpath("//table[@id='flywiz_tblQuotes']")
 
+    # TODO: (optional) check network in firefox inspector and make get/post requests to get necessary data
     meta_info_about_flights = table[0].xpath("./tr[contains(@id,'rinf')]")
-    # Remove all info about radio button
-    for row in meta_info_about_flights:
-        row.remove(row[0])
-
-    flight_ids = table[0].xpath("./tr[contains(@id,'rinf')]/@id")
+    flight_ids = [item[-5:]
+                  for item in table[0].xpath("./tr[contains(@id,'rinf')]/@id")]
+    flights = dict(zip(flight_ids, meta_info_about_flights))
 
     flights_data = {}
 
     # TODO: add useful comments for this cycle
-    for flight in meta_info_about_flights:
+    for flight_id, flight_info in flights.items():
+        # flight_info[0] contains unnecessary data
         try:
-            flight_date = datetime.datetime.strptime(flight[0].text,
+            flight_date = datetime.datetime.strptime(flight_info[1].text,
                                                      "%a, %d %b %y")
         except BaseException:
             raise ValueError("Could not correctly parse flight date. "
                              "Table does not contain date.")
 
-        if flight_date == args.dep_date and args.dep_city in flight[3].text\
-                and args.dest_city in flight[4].text:
+        dep_city = flight_info[4].text[-4:-1]
+        dest_city = flight_info[5].text[-4:-1]
 
-            flight_info = [cell.text for cell in flight]
+        if flight_date == args.dep_date and args.dep_city == dep_city\
+                and args.dest_city == dest_city:
+
+            # TODO: could be safely removed
+            flight_infos = [cell.text for cell in flight_info]
+            # TODO: try to use grandparent from xpath here to avoid table indexing
             price_and_extra_info_unparsed = table[0].xpath(
-                f"./tr[contains(@id,'{flight_ids[0][-5:]}') and not(contains(@id, 'rinf'))]/td[text()]")
+                f"./tr[contains(@id,'{flight_id}') and not(contains(@id, 'rinf'))]/td[text()]")
             price_and_extra_info = [
                 item.text for item in price_and_extra_info_unparsed]
-            flights_data["Outbound"] = write_flight_information(flight_info,
+            flights_data["Outbound"] = write_flight_information(flight_infos[1:],
                                                                 price_and_extra_info,
                                                                 args.persons)
-        # elif flight_date == args.return_date and args.dep_city in flight[4].text\
-        #         and args.dest_city in flight[3].text:
 
-        #     flight_info = [cell.text for cell in flight]
-        #     flights_data["Inbound"] = write_flight_information(flight_info,
-        #                                                        args.persons)
+        elif flight_date == args.return_date and args.dep_city in dest_city\
+                and args.dest_city in dep_city:
 
+            flight_infos = [cell.text for cell in flight_info]
+            price_and_extra_info_unparsed = table[0].xpath(
+                f"./tr[contains(@id,'{flight_id}') and not(contains(@id, 'rinf'))]/td[text()]")
+            price_and_extra_info = [
+                item.text for item in price_and_extra_info_unparsed]
+            flights_data["Inbound"] = write_flight_information(flight_infos[1:],
+                                                               price_and_extra_info,
+                                                               args.persons)
 
     return flights_data
 
@@ -241,7 +236,7 @@ def print_flights_information(flights_info):
     """
 
     # Table header
-    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<21}\
+    print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
         ".format("Direction", *flights_info["Outbound"].keys()))
     # Outbound flight
     print("{:<12} {:<17} {:<10} {:<10} {:<15} {:<20} {:<20} {:<13} {:<20}\
@@ -333,21 +328,27 @@ def write_flight_information(meta_flight_info, price_and_extra_info, persons):
 
     Arguments:
         meta_flight_info {list} -- parsed from booking engine data.
+        price_and_extra_info {list} -- price and additional information.
         persons {int} -- total number of people to book.
 
     Returns:
         dict -- parsed flight information.
     """
 
+    # price_and_extra_info[0] contains extra "Price: " and "EUR"
     total_cost = int(price_and_extra_info[0][7:-7]) * persons
+    flight_duration = calculate_flight_duration(*meta_flight_info[1:3])
+    # flight_duration = calculate_flight_duration(meta_flight_info[1], meta_flight_info[2])
+    extra_info = price_and_extra_info[1]if len(
+        price_and_extra_info) > 1 else ""
 
-    return {"Date": meta_flight_info[0],
-            "Departure": meta_flight_info[1],
-            "Arrival": meta_flight_info[2],
-            "Flight duration": calculate_flight_duration(
-        *meta_flight_info[1:3]),
+    return {
+        "Date": meta_flight_info[0],
+        "Departure": meta_flight_info[1],
+        "Arrival": meta_flight_info[2],
+        "Flight duration": flight_duration,
         "From": meta_flight_info[3],
         "To": meta_flight_info[4],
         "Price": f"{total_cost}.00 EUR",
-        "Additional information": price_and_extra_info[1]
-        if len(price_and_extra_info) > 1 else ""}
+        "Additional information": extra_info
+    }
