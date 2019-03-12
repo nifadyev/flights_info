@@ -360,7 +360,7 @@ class TestParseArguments(unittest.TestCase):
             source.parse_arguments(list())
 
 
-class TestParseUrlParameters(unittest.TestCase):
+class TestCreateUrlParameters(unittest.TestCase):
     def test_return_valid_parameters_one_way(self):
         date = datetime.datetime.strptime("08.07.2019", "%d.%m.%Y")
         args = argparse.Namespace(dep_city="BOJ", dest_city="BLL",
@@ -370,7 +370,7 @@ class TestParseUrlParameters(unittest.TestCase):
         expected_args = {"ow": "", "lang": "en", "depdate": "08.07.2019",
                          "aptcode1": "BOJ", "aptcode2": "BLL", "paxcount": 2}
 
-        self.assertEqual(source.parse_url_parameters(args), expected_args)
+        self.assertEqual(source.create_url_parameters(args), expected_args)
 
     def test_return_valid_parameters_two_way(self):
         date = datetime.datetime.strptime("18.07.2019", "%d.%m.%Y")
@@ -382,20 +382,21 @@ class TestParseUrlParameters(unittest.TestCase):
                          "aptcode1": "BOJ", "rtdate": "31.07.2019",
                          "aptcode2": "CPH", "paxcount": 5}
 
-        self.assertEqual(source.parse_url_parameters(args), expected_args)
+        self.assertEqual(source.create_url_parameters(args), expected_args)
 
 
 class TestWriteFlightInformation(unittest.TestCase):
     def test_return_valid_flight_info(self):
         args = ("Wed, 24 Jul 19", "02:45", "06:25", "Copenhagen (CPH)",
-                "Burgas (BOJ)", "Price: 145.00 EUR")
+                "Burgas (BOJ)")
+        price = ("Price: 145.00 EUR", "")
 
         expected_args = {"Date": "Wed, 24 Jul 19", "Departure": "02:45",
                          "Arrival": "06:25", "Flight duration": "03:40",
                          "From": "Copenhagen (CPH)", "To": "Burgas (BOJ)",
                          "Price": "435.00 EUR", "Additional information": ""}
 
-        self.assertEqual(source.write_flight_information(args, 3),
+        self.assertEqual(source.write_flight_information(args, price, 3),
                          expected_args)
 
 
