@@ -116,76 +116,52 @@ def find_flight_info(arguments):
             raise ValueError(message + request.text)
         else:
             raise ValueError(message + "Use --verbose for more details.")
+
     # TODO: take only table and do subrequests to it by another xpath
     # ! how to differentiate rows with main info and row with price
     # ! search in table for trs with tds contining input atr
     # ! then save meta data about flight AND arg of onclick=selectedRow()
     # ! then again search in table for  tr with saved arg to get price and add info
-    table = html.xpath("//table[@id='flywiz_tblQuotes']/tr/td[text()]")
-    # table = html.xpath(
-    #     "/html/body/form[@id='form1']/div/table[@id='flywiz']"
-    #     "/tr/td/table[@id='flywiz_tblQuotes']")
 
-    table_list = html.xpath("//table[@id='flywiz_tblQuotes']")
-    # table_list = html.xpath("/html/body/form[@id='form1']/div/table[@id='flywiz']"
-    #     "/tr/td/table[@id='flywiz_tblQuotes']")[0]
-    # print(type(table_list),type(table_list[0]), len(table_list))
-    # table_tree = lxml.etree.HTML(table_list)
-    # print(html.get_element_by_id("flywiz*"))
-    # ! valid solution but choose button is included
-    # temp = table_list[0].xpath("./tr[contains(@id,'rinf')]")
-    # meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]/td[not(position()=1)]")
-    meta_info_about_flights = table_list[0].xpath("./tr[contains(@id,'rinf')]")
-    # Remove all info about radio button 
+    # table = html.xpath("//table[@id='flywiz_tblQuotes']/tr/td[text()]")
+    table = html.xpath("//table[@id='flywiz_tblQuotes']")
+
+    meta_info_about_flights = table[0].xpath("./tr[contains(@id,'rinf')]")
+    # Remove all info about radio button
     for row in meta_info_about_flights:
         row.remove(row[0])
 
-        # print(row.xpath("./td/input")[0])
-    print(len(meta_info_about_flights[0]), meta_info_about_flights[0][0].text)
-    # flight_ids = meta_info_about_flights[0].xpath("../tr[contains(@id,'rinf')]/@id")
-    flight_ids = table_list[0].xpath("./tr[contains(@id,'rinf')]/@id")
-    print(type(flight_ids[0]), len(flight_ids))
-    outbound_price_and_extra_info = table_list[0].xpath(f"./tr[contains(@id,'{flight_ids[0][-5:]}') and not(contains(@id, 'rinf'))]")
-    # temp2 = temp[0].xpath("./td[text()]")
-    # print(request.text)
-    print(meta_info_about_flights)
-    print(flight_ids[0], flight_ids[0][-5:])
-    print(len(meta_info_about_flights))
-    for i in outbound_price_and_extra_info:
-        print(i[1].text)
-    print(len(outbound_price_and_extra_info))
-    # print(meta_info_about_flights[0][0].text)
-    # print(type(table_list))
-    # print(type(request.text))
-    sys.exit(0)
-    i = 0
-    # flights_data = dict()
+    flight_ids = table[0].xpath("./tr[contains(@id,'rinf')]/@id")
+
     flights_data = {}
+
     # TODO: add useful comments for this cycle
-    while i < len(table):
+    for flight in meta_info_about_flights:
         try:
-            flight_date = datetime.datetime.strptime(table[i].text,
+            flight_date = datetime.datetime.strptime(flight[0].text,
                                                      "%a, %d %b %y")
         except BaseException:
             raise ValueError("Could not correctly parse flight date. "
                              "Table does not contain date.")
 
-        if flight_date == args.dep_date and args.dep_city in table[i+3].text\
-                and args.dest_city in table[i+4].text:
+        if flight_date == args.dep_date and args.dep_city in flight[3].text\
+                and args.dest_city in flight[4].text:
 
-            # i - i+6 table elements contain info about 1 flight
-            flight_info = [cell.text for cell in table[i:i+6]]
+            flight_info = [cell.text for cell in flight]
+            price_and_extra_info_unparsed = table[0].xpath(
+                f"./tr[contains(@id,'{flight_ids[0][-5:]}') and not(contains(@id, 'rinf'))]/td[text()]")
+            price_and_extra_info = [
+                item.text for item in price_and_extra_info_unparsed]
             flights_data["Outbound"] = write_flight_information(flight_info,
+                                                                price_and_extra_info,
                                                                 args.persons)
-        elif args.return_date and flight_date == args.return_date\
-                and args.dep_city in table[i+4].text\
-                and args.dest_city in table[i+3].text:
+        # elif flight_date == args.return_date and args.dep_city in flight[4].text\
+        #         and args.dest_city in flight[3].text:
 
-            flight_info = [cell.text for cell in table[i:i+6]]
-            flights_data["Inbound"] = write_flight_information(flight_info,
-                                                               args.persons)
+        #     flight_info = [cell.text for cell in flight]
+        #     flights_data["Inbound"] = write_flight_information(flight_info,
+        #                                                        args.persons)
 
-        i += 6
 
     return flights_data
 
@@ -243,18 +219,7 @@ def create_url_parameters(args):
     Returns:
         dict -- valid url parameters.
     """
-    # TODO: get rid of 3 if statements
-    # parameters = {"rt" if args.return_date else "ow": "", "lang": "en",
-    #               "depdate": args.dep_date.strftime("%d.%m.%Y"),
-    #               "aptcode1": args.dep_city,
-    #               "rtdate": args.return_date.strftime("%d.%m.%Y")
-    #               if args.return_date else "",
-    #               "aptcode2": args.dest_city, "paxcount": args.persons}
 
-    # if not args.return_date:
-    #     del parameters["rtdate"]
-
-    # return parameters
     if args.return_date:
         return {"rt": "", "lang": "en",
                 "depdate": args.dep_date.strftime("%d.%m.%Y"),
@@ -363,33 +328,26 @@ def validate_persons(persons):
     return valid_persons
 
 
-def write_flight_information(raw_flight_info, persons):
+def write_flight_information(meta_flight_info, price_and_extra_info, persons):
     """Parse flight information.
 
     Arguments:
-        raw_flight_info {list} -- parsed from booking engine data.
+        meta_flight_info {list} -- parsed from booking engine data.
         persons {int} -- total number of people to book.
 
     Returns:
         dict -- parsed flight information.
     """
-    # TODO: write to parsed_flight_info явно
-    # parsed_flight_info = {"Date": "bla-bla", etc
-    parsed_flight_info = {"Date": "", "Departure": "", "Arrival": "",
-                          "Flight duration": "", "From": "", "To": "",
-                          "Price": "", "Additional information": ""}
 
-    parsed_flight_info["Flight duration"] = calculate_flight_duration(
-        *raw_flight_info[1:3])
-    total_cost = int(raw_flight_info[-1][7:-7]) * persons
-    parsed_flight_info["Price"] = f"{total_cost}.00 EUR"
+    total_cost = int(price_and_extra_info[0][7:-7]) * persons
 
-    i = 0
-    # TODO: add additional information handling
-    for key in parsed_flight_info:
-        # ! i < 6 if there is additional information
-        if not parsed_flight_info[key] and i < 5:
-            parsed_flight_info[key] = raw_flight_info[i]
-            i += 1
-
-    return parsed_flight_info
+    return {"Date": meta_flight_info[0],
+            "Departure": meta_flight_info[1],
+            "Arrival": meta_flight_info[2],
+            "Flight duration": calculate_flight_duration(
+        *meta_flight_info[1:3]),
+        "From": meta_flight_info[3],
+        "To": meta_flight_info[4],
+        "Price": f"{total_cost}.00 EUR",
+        "Additional information": price_and_extra_info[1]
+        if len(price_and_extra_info) > 1 else ""}
