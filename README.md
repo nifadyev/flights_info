@@ -5,19 +5,22 @@ Command line application for searching available flights from flybulgarien.dk
 ## Flights informer command line arguments
 
 ```
-usage: main.py [-h] [-return_date RETURN_DATE] dep_city dest_city dep_date persons
+usage: main.py [-h] [-return_date RETURN_DATE] [-v]
+               dep_city dest_city dep_date passengers
 
 Flight informer
 
 positional arguments:
   dep_city              departure city IATA code
   dest_city             destination city IATA code
-  dep_date              outbound flight date
-  persons               total number of persons
+  dep_date              departure flight date
+  passengers            total number of passengers
 
 optional arguments:
   -h, --help            show this help message and exit
-  -return_date          inbound flight date
+  -return_date RETURN_DATE
+                        return flight date
+  -v, --verbose         verbose output about errors
 ```
 
 ## Examples
