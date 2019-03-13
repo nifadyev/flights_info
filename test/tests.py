@@ -2,6 +2,7 @@ import unittest
 import argparse
 import itertools
 import datetime
+# from datetime import datetime
 import src.script as source
 
 
@@ -11,25 +12,14 @@ class TestValidateDate(unittest.TestCase):
         with self.assertRaises(ValueError):
             source.validate_date("26.06.20191")
 
-    def test_invalid_date_format1(self):
-        with self.assertRaises(ValueError):
-            source.validate_date("03-04-2019")
+    def test_invalid_date_format(self):
+        invalid_dates = ("03-04-2019", "24 Aug 2019", "2019.01.24", "11.02.19",
+                         "05/11/2019")
 
-    def test_invalid_date_format2(self):
-        with self.assertRaises(ValueError):
-            source.validate_date("24 Aug 2019")
-
-    def test_invalid_date_format3(self):
-        with self.assertRaises(ValueError):
-            source.validate_date("2019.01.24")
-
-    def test_invalid_date_format4(self):
-        with self.assertRaises(ValueError):
-            source.validate_date("11.02.19")
-
-    def test_invalid_date_format5(self):
-        with self.assertRaises(ValueError):
-            source.validate_date("05/11/2019")
+        for date in invalid_dates:
+            with self.subTest(date):
+                with self.assertRaises(ValueError):
+                    source.validate_date(date)
 
     def test_invalid_type(self):
         with self.assertRaises(ValueError):
@@ -82,33 +72,35 @@ class TestValidateCityCodes(unittest.TestCase):
 class TestValidatePersons(unittest.TestCase):
 
     def test_valid_persons_number(self):
-        for persons in range(1, 9):
-            with self.subTest(persons):
-                self.assertEqual(source.validate_persons(persons), persons)
+        args = (1, 6, 8)
+
+        for number in args:
+            with self.subTest(number):
+                self.assertEqual(source.validate_persons(number), number)
 
     def test_negative_persons_number(self):
-        for persons in range(-100, 1):
-            with self.subTest(persons):
+        args = (-56, -3, -1, 0)
+
+        for number in args:
+            with self.subTest(number):
                 with self.assertRaises(argparse.ArgumentTypeError):
-                    source.validate_persons(persons)
+                    source.validate_persons(number)
 
     def test_too_big_persons_number(self):
-        for persons in range(9, 100):
-            with self.subTest(persons):
+        args = (9, 23, 99, 1034)
+
+        for number in args:
+            with self.subTest(number):
                 with self.assertRaises(argparse.ArgumentTypeError):
-                    source.validate_persons(persons)
+                    source.validate_persons(number)
 
-    def test_invalid_type1(self):
-        with self.assertRaises(TypeError):
-            source.validate_persons("g")
-
-    def test_invalid_type2(self):
+    def test_invalid_type(self):
         with self.assertRaises(TypeError):
             source.validate_persons("wasd")
 
 
 class TestCalculateFlightDuration(unittest.TestCase):
-
+    # ? Merge this tests into 2 big
     def test_duration_less_than_1(self):
         self.assertEqual(source.calculate_flight_duration("12:40", "13:35"),
                          "00:55")
@@ -140,6 +132,7 @@ class TestCalculateFlightDuration(unittest.TestCase):
     def test_night_flight_duration_more_than_20(self):
         self.assertEqual(source.calculate_flight_duration("16:00", "15:00"),
                          "23:00")
+    # ? too much tests
 
     def test_equal_dep_time_and_arr_time(self):
         for hours in range(24):
@@ -185,7 +178,6 @@ class TestCheckRoute(unittest.TestCase):
                         source.check_route(dep_city, arr_city, dep_date)
 
     def test_unavailable_routes_inbound(self):
-        dep_date = datetime.datetime.strptime("01.07.2019", "%d.%m.%Y")
         return_date = datetime.datetime.strptime("05.09.2019", "%d.%m.%Y")
 
         for dep_city, arr_city in itertools.permutations(self.city_codes, r=2):
@@ -198,25 +190,20 @@ class TestCheckRoute(unittest.TestCase):
         for route in self.dates:
             for date in self.dates[route]:
                 with self.subTest(date):
-                    parsed_date = datetime.datetime.strptime(date,
-                                                             "%d.%m.%Y")
-                    invalid_date = datetime.datetime(year=parsed_date.year-1,
-                                                     month=parsed_date.month,
-                                                     day=parsed_date.day)
+                    parsed_date = datetime.datetime.strptime(date, "%d.%m.%Y")
+                    invalid_date = parsed_date.replace(year=2018)
+
                     with self.assertRaises(KeyError):
                         source.check_route(route[0], route[1], invalid_date)
+    # ? possible duplicates
 
     def test_unavailable_return_dates(self):
         for route in self.dates:
             for date in self.dates[route]:
                 with self.subTest(date):
-                    parsed_date = datetime.datetime.strptime(date,
-                                                             "%d.%m.%Y")
-                    # TODO: do this for each test
-                    # invalid_date = datetime.datetime(year=parsed_date.year+1,
-                    #                                  month=parsed_date.month,
-                    #                                  day=parsed_date.day)
+                    parsed_date = datetime.datetime.strptime(date, "%d.%m.%Y")
                     invalid_date = parsed_date.replace(year=2020)
+
                     with self.assertRaises(KeyError):
                         source.check_route(route[0], route[1], invalid_date)
 
@@ -254,7 +241,7 @@ class TestFindFlightInfo(unittest.TestCase):
 
         self.assertEqual(source.find_flight_info(args), expected_data)
 
-
+    # ? subTest
     def test_dep_date_in_the_past1(self):
         args = ("CPH", "BOJ", "10.07.2019", "3", "-return_date=03.07.2019")
 
@@ -318,6 +305,7 @@ class TestParseArguments(unittest.TestCase):
         with self.assertRaises(SystemExit):
             source.parse_arguments(args)
 
+    # ? subTest
     def test_invalid_return_date1(self):
         args = ("BLL", "BOJ", "01.09.2019", "1", "-return-date=13.10.2019")
 
