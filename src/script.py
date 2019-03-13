@@ -9,6 +9,8 @@ import requests
 # TODO: update README
 # TODO: update imports to take only whats necessary
 # ! max comment and docsting length is 72
+# TODO: use paragraph indentation
+# TODO: Add docstring for meta_flight_info
 
 VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
 
@@ -34,13 +36,15 @@ def calculate_flight_duration(departure_time, arrival_time):
 
     dep_time = datetime.strptime(departure_time, "%H:%M")
     arr_time = datetime.strptime(arrival_time, "%H:%M")
-    duration = timedelta(hours=arr_time.hour-dep_time.hour,
-                         minutes=arr_time.minute-dep_time.minute)
+    duration = timedelta(
+        hours=arr_time.hour-dep_time.hour,
+        minutes=arr_time.minute-dep_time.minute
+    )
 
     hours = duration.seconds // 3600
     minutes = (duration.seconds - hours*3600) // 60
     formatted_hours = hours if hours>=10 else f"0{hours}"
-    formatted_minutes = minutes if minutes>=10 else f"0{minutes}"
+    formatted_minutes = minutes if minutes >= 10 else f"0{minutes}"
 
     # TODO: possibly create datetime.time and return time.strftime
     return f"{formatted_hours}:{formatted_minutes}"
@@ -49,7 +53,7 @@ def calculate_flight_duration(departure_time, arrival_time):
 def check_route(dep_city, dest_city, flight_date):
     """Search route based of passed args in database.
 
-    Raises:
+    Raises:-
         KeyError -- unavailable route.
         KeyError -- no available flights for passed dates.
     """
@@ -108,12 +112,12 @@ def find_flight_info(arguments):
         message = "Could not parse response, please try again. "
         # raise ValueError(message + (response.text if args.verbose
         #                             else "Use --verbose for more details."))
-        raise ValueError(message + (response.text if args.verbose is not None
-                                    else "Use --verbose for more details."))
-        # if args.verbose:
-        #     raise ValueError(message + response.text)
-        # else:
-        #     raise ValueError(message + "Use --verbose for more details.")
+        # raise ValueError(message + (response.text if args.verbose is not None
+        #                             else "Use --verbose for more details."))
+        if args.verbose:
+            raise ValueError(message + response.text)
+        else:
+            raise ValueError(message + "Use --verbose for more details.")
 
     # TODO: (optional) check network in firefox inspector and make get/post
     # TODO: requests to get necessary data
@@ -146,12 +150,14 @@ def find_flight_info(arguments):
                 and args.dest_city == dest_city:
             # TODO: could be safely removed
             flight_infos = [
-                item.text for item in flight_info if item.text is not None]
+                item.text for item in flight_info]
+            # flight_infos = [
+            #     item.text for item in flight_info if item.text is not None]
             price_and_extra_info_unparsed = table.xpath(
                 f"./tr[contains(@id,'{flight_id}') and not(contains(@id, 'rinf'))]/td[text()]")
             price_and_extra_info = [
                 item.text for item in price_and_extra_info_unparsed]
-            flights_data["Outbound"] = write_flight_information(flight_infos,
+            flights_data["Outbound"] = write_flight_information(flight_infos[1:],
                                                                 price_and_extra_info,
                                                                 args.persons)
 
@@ -288,10 +294,10 @@ def validate_city_code(code):
     """
 
     if code not in VALID_CITY_CODES:
-        raise argparse.ArgumentTypeError(
-            "Invalid city code. Choose from this list: CPH, BLL, "
-            "PDV, BOJ, SOF, VAR")
-        # f"Invalid city code. Choose from this list: {VALID_CITY_CODES}")
+        # raise argparse.ArgumentTypeError(
+        #     "Invalid city code. Choose from this list: CPH, BLL, "
+        #     "PDV, BOJ, SOF, VAR")
+        f"Invalid city code. Choose from this list: {VALID_CITY_CODES}")
 
     return code
 
@@ -337,14 +343,14 @@ def validate_persons(persons):
         raise TypeError("Invalid type of persons. Must be digit (1-8).")
 
     # if not 0 < valid_persons < 9:
-    # if valid_persons<1 or valid_persons>9:
-    if valid_persons not in range(1, 9):
+    if valid_persons<1 or valid_persons>9:
+    # if valid_persons not in range(1, 9):
         raise argparse.ArgumentTypeError("Invalid persons number. "
                                          "Max persons number: 8")
 
     return valid_persons
 
-
+# TODO: pass args explicitly, meaning pass each arg of meta_flight_info separatly
 def write_flight_information(meta_flight_info, price_and_extra_info, persons):
     """Parse flight information.
 
