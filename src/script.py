@@ -1,12 +1,16 @@
 import argparse
-import datetime
+# import datetime  # ? from datetime import datetime
 import sys
+from datetime import datetime, timedelta
 import lxml.html
 import requests
-import typing
 
 # TODO: change output method from horizontal to vertical table
-# TODO: (optional) add strict typization
+# TODO: update README
+# TODO: update imports to take only whats necessary
+# ! max comment and docsting length is 72
+
+VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
 
 # All available routes and dates
 DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
@@ -21,28 +25,28 @@ DATES = {("CPH", "BOJ"): {"26.06.2019", "03.07.2019", "10.07.2019",
                           "22.07.2019", "29.07.2019", "05.08.2019"}}
 
 
-def calculate_flight_duration(departure_time: str, arrival_time: str) -> str:
+def calculate_flight_duration(departure_time, arrival_time):
     """Calculate flight duration.
 
     Returns:
         str -- flight duration in format hh:mm.
     """
 
-    dep_time = datetime.datetime.strptime(departure_time, "%H:%M")
-    arr_time = datetime.datetime.strptime(arrival_time, "%H:%M")
-    duration = datetime.timedelta(hours=arr_time.hour-dep_time.hour,
-                                  minutes=arr_time.minute-dep_time.minute)
+    dep_time = datetime.strptime(departure_time, "%H:%M")
+    arr_time = datetime.strptime(arrival_time, "%H:%M")
+    duration = timedelta(hours=arr_time.hour-dep_time.hour,
+                         minutes=arr_time.minute-dep_time.minute)
 
     hours = duration.seconds // 3600
-    minutes = (duration.seconds - hours * 3600) // 60
-    formatted_hours = hours if hours >= 10 else f"0{hours}"
-    formatted_minutes = minutes if minutes >= 10 else f"0{minutes}"
+    minutes = (duration.seconds - hours*3600) // 60
+    formatted_hours = hours if hours>=10 else f"0{hours}"
+    formatted_minutes = minutes if minutes>=10 else f"0{minutes}"
 
     # TODO: possibly create datetime.time and return time.strftime
     return f"{formatted_hours}:{formatted_minutes}"
 
-
-def check_route(dep_city: str, dest_city: str, flight_date: str) -> None:
+# ? Describe obvious args and its type
+def check_route(dep_city, dest_city, flight_date):
     """Search route based of passed args in database.
 
     Raises:
@@ -50,23 +54,24 @@ def check_route(dep_city: str, dest_city: str, flight_date: str) -> None:
         KeyError -- no available flights for passed dates.
     """
 
-    if (dep_city, dest_city) not in DATES:
+    current_route = (dep_city, dest_city)
+
+    if current_route not in DATES:
         available_routes = ",".join(f"({dep_city}, {dest_city})"
                                     for dep_city, dest_city in DATES)
-
+        # available_routes = [f"({dep_city}, {dest_city})" for dep_city, dest_city in DATES]
         raise KeyError(f"Route not found. Available routes:{available_routes}")
 
-    if flight_date.strftime("%d.%m.%Y") not in DATES[(dep_city, dest_city)]:
+    if flight_date.strftime("%d.%m.%Y") not in DATES[current_route]:
         message = "Flights for chosen dates not found. Available dates: "
+        raise KeyError(message + ", ".join(DATES[current_route]))
 
-        raise KeyError(message + ", ".join(DATES[(dep_city, dest_city)]))
 
-
-def find_flight_info(arguments: typing.List[str]) -> typing.Dict[str, dict]:
+def find_flight_info(arguments):
     """Handle arguments and search for available flights on flybulgarien.dk.
 
     Arguments:
-        arguments {list} -- command line arguments
+        arguments {list} -- command line arguments.
 
     Returns:
         dict -- Available information about flights.
@@ -76,88 +81,98 @@ def find_flight_info(arguments: typing.List[str]) -> typing.Dict[str, dict]:
 
     try:
         check_route(args.dep_city, args.dest_city, args.dep_date)
-        if args.return_date:
+        # if args.return_date:
+        if args.return_date is not None:
             if args.dep_date > args.return_date:
                 raise ValueError("Departure date is in the past "
                                  "in comparison with return date")
 
             check_route(args.dest_city, args.dep_city, args.return_date)
-    except KeyError as e:
-        if args.verbose:
-            raise e
+    except KeyError as key_error:
+        # if args.verbose:
+        if args.verbose is not None:
+            raise key_error
         else:
             print(sys.exc_info()[1])
             sys.exit()
 
-    request = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
-                           params=create_url_parameters(args))
+    response = requests.get("https://apps.penguin.bg/fly/quote3.aspx",
+                            params=create_url_parameters(args))
 
     # TODO: handle An internal error occurred.
     # TODO: Please retry your request. on site
     # ? case for testing this try-except block
     try:
-        html = lxml.html.document_fromstring(request.text)
+        html_page = lxml.html.document_fromstring(response.text)
     except ValueError:
         message = "Could not parse response, please try again. "
-        if args.verbose:
-            raise ValueError(message + request.text)
-        else:
-            raise ValueError(message + "Use --verbose for more details.")
+        # raise ValueError(message + (response.text if args.verbose
+        #                             else "Use --verbose for more details."))
+        raise ValueError(message + (response.text if args.verbose is not None
+                                    else "Use --verbose for more details."))
+        # if args.verbose:
+        #     raise ValueError(message + response.text)
+        # else:
+        #     raise ValueError(message + "Use --verbose for more details.")
 
+    # TODO: (optional) check network in firefox inspector and make get/post
+    # TODO: requests to get necessary data
     # 0 element contains tbody => full table
-    table = html.xpath("//table[@id='flywiz_tblQuotes']")
-
-    # TODO: (optional) check network in firefox inspector and make get/post requests to get necessary data
-    meta_info_about_flights = table[0].xpath("./tr[contains(@id,'rinf')]")
+    # ? content_table
+    table = html_page.xpath("//table[@id='flywiz_tblQuotes']")[0]
+    meta_info_about_flights = table.xpath("tr[contains(@id,'rinf')]")
+    # meta_info_about_flights = table.xpath("./tr[contains(@id,'rinf')]")
+    # IDs differ only in last 5 elements
     flight_ids = [item[-5:]
-                  for item in table[0].xpath("./tr[contains(@id,'rinf')]/@id")]
+                  for item in table.xpath("./tr[contains(@id,'rinf')]/@id")]
     flights = dict(zip(flight_ids, meta_info_about_flights))
 
-    flights_data = {}
+    flights_data = {}  # ? output_table
 
     # TODO: add useful comments for this cycle
     for flight_id, flight_info in flights.items():
-        # flight_info[0] contains unnecessary data
+        # flight_info[0] contains unnecessary info about radio button
         try:
-            flight_date = datetime.datetime.strptime(flight_info[1].text,
-                                                     "%a, %d %b %y")
+            flight_date = datetime.strptime(flight_info[1].text,
+                                            "%a, %d %b %y")
         except BaseException:
-            raise ValueError("Could not correctly parse flight date. "
-                             "Table does not contain date.")
+            raise ValueError("Could not correctly parse flight date.")
 
+        # IATA city codes are at the end of flight_info[4].text
         dep_city = flight_info[4].text[-4:-1]
         dest_city = flight_info[5].text[-4:-1]
 
         if flight_date == args.dep_date and args.dep_city == dep_city\
                 and args.dest_city == dest_city:
-
             # TODO: could be safely removed
-            flight_infos = [cell.text for cell in flight_info]
-            # TODO: try to use grandparent from xpath here to avoid table indexing
-            price_and_extra_info_unparsed = table[0].xpath(
+            flight_infos = [
+                item.text for item in flight_info if item.text is not None]
+            price_and_extra_info_unparsed = table.xpath(
                 f"./tr[contains(@id,'{flight_id}') and not(contains(@id, 'rinf'))]/td[text()]")
             price_and_extra_info = [
                 item.text for item in price_and_extra_info_unparsed]
-            flights_data["Outbound"] = write_flight_information(flight_infos[1:],
+            flights_data["Outbound"] = write_flight_information(flight_infos,
                                                                 price_and_extra_info,
                                                                 args.persons)
 
         elif flight_date == args.return_date and args.dep_city in dest_city\
                 and args.dest_city in dep_city:
-
-            flight_infos = [cell.text for cell in flight_info]
-            price_and_extra_info_unparsed = table[0].xpath(
+            flight_infos = [
+                item.text for item in flight_info if item.text is not None]
+            # ! Inconsistent indentation
+            price_and_extra_info_unparsed = table.xpath(
                 f"./tr[contains(@id,'{flight_id}') and not(contains(@id, 'rinf'))]/td[text()]")
+            # ! Inconsistent indentation
             price_and_extra_info = [
                 item.text for item in price_and_extra_info_unparsed]
-            flights_data["Inbound"] = write_flight_information(flight_infos[1:],
+            flights_data["Inbound"] = write_flight_information(flight_infos,
                                                                price_and_extra_info,
                                                                args.persons)
 
     return flights_data
 
 
-def parse_arguments(args: typing.List[str]) -> argparse.Namespace:
+def parse_arguments(args):
     """Handle command line arguments using argparse.
 
     Arguments:
@@ -178,18 +193,20 @@ def parse_arguments(args: typing.List[str]) -> argparse.Namespace:
     argument_parser.add_argument("dest_city",
                                  help="destination city IATA code",
                                  type=validate_city_code)
-    argument_parser.add_argument("dep_date", help="departure flight date",
+    argument_parser.add_argument("dep_date",
+                                 help="departure flight date",
                                  type=validate_date)
     argument_parser.add_argument("persons",
                                  help="total number of persons",
                                  type=validate_persons)
-    argument_parser.add_argument("-return_date", help="return flight date",
+    argument_parser.add_argument("-return_date",
+                                 help="return flight date",
                                  type=validate_date)
     argument_parser.add_argument("-v", "--verbose",
                                  help="verbose output about errors",
                                  action='store_true')
 
-    def raise_value_error(err_msg: str):
+    def raise_value_error(err_msg):
         raise argparse.ArgumentTypeError(err_msg)
 
     argument_parser.error = raise_value_error
@@ -201,7 +218,7 @@ def parse_arguments(args: typing.List[str]) -> argparse.Namespace:
         sys.exit()
 
 
-def create_url_parameters(args: str) -> typing.Dict[str, str]:
+def create_url_parameters(args):
     """Create parameters for making get request.
 
     Arguments:
@@ -212,20 +229,28 @@ def create_url_parameters(args: str) -> typing.Dict[str, str]:
     """
 
     # ? namedtuple with asdict method
-    if args.return_date:
-        return {"rt": "", "lang": "en",
-                "depdate": args.dep_date.strftime("%d.%m.%Y"),
-                "aptcode1": args.dep_city,
-                "rtdate": args.return_date.strftime("%d.%m.%Y"),
-                "aptcode2": args.dest_city, "paxcount": args.persons}
-
-    return {"ow": "", "lang": "en",
+    if args.return_date is not None:
+        return {
+            "rt": "",
+            "lang": "en",
             "depdate": args.dep_date.strftime("%d.%m.%Y"),
             "aptcode1": args.dep_city,
-            "aptcode2": args.dest_city, "paxcount": args.persons}
+            "rtdate": args.return_date.strftime("%d.%m.%Y"),
+            "aptcode2": args.dest_city,
+            "paxcount": args.persons
+        }
+
+    return {
+        "ow": "",
+        "lang": "en",
+        "depdate": args.dep_date.strftime("%d.%m.%Y"),
+        "aptcode1": args.dep_city,
+        "aptcode2": args.dest_city,
+        "paxcount": args.persons
+    }
 
 
-def print_flights_information(flights_info: typing.Dict[str, dict]) -> None:
+def print_flights_information(flights_info):
     """Show information about flights.
 
     Arguments:
@@ -240,7 +265,7 @@ def print_flights_information(flights_info: typing.Dict[str, dict]) -> None:
         ".format("Outbound", *flights_info["Outbound"].values()))
     # Inbound flight
     if "Inbound" in flights_info:
-        # Last 7 char of price contains currency
+        # Last 7 chars of price contains currency and .00
         total_cost = int(flights_info["Outbound"]["Price"][:-7])\
             + int(flights_info["Inbound"]["Price"][:-7])
 
@@ -249,7 +274,7 @@ def print_flights_information(flights_info: typing.Dict[str, dict]) -> None:
         print("{:<12} {:<10}".format("Total cost", f"{total_cost}.00 EUR"))
 
 
-def validate_city_code(code: str) -> str:
+def validate_city_code(code):
     """City code validator.
 
     Arguments:
@@ -262,17 +287,16 @@ def validate_city_code(code: str) -> str:
         str -- valid city code.
     """
 
-    VALID_CITY_CODES = {"CPH", "BLL", "PDV", "BOJ", "SOF", "VAR"}
-
     if code not in VALID_CITY_CODES:
         raise argparse.ArgumentTypeError(
             "Invalid city code. Choose from this list: CPH, BLL, "
             "PDV, BOJ, SOF, VAR")
+        # f"Invalid city code. Choose from this list: {VALID_CITY_CODES}")
 
     return code
 
 
-def validate_date(flight_date: str) -> datetime.datetime:
+def validate_date(flight_date):
     """Flight date validator.
 
     Arguments:
@@ -285,16 +309,15 @@ def validate_date(flight_date: str) -> datetime.datetime:
         datetime.datetime -- valid flight date.
     """
 
-    parsed_date = datetime.datetime.strptime(
-        flight_date, "%d.%m.%Y")
+    parsed_date = datetime.strptime(flight_date, "%d.%m.%Y")
 
-    if datetime.datetime.today() > parsed_date:
+    if datetime.today() > parsed_date:
         raise argparse.ArgumentTypeError("Date in the past")
 
     return parsed_date
 
 
-def validate_persons(persons: str) -> int:
+def validate_persons(persons):
     """Persons number validator.
 
     Arguments:
@@ -313,16 +336,16 @@ def validate_persons(persons: str) -> int:
     except ValueError:
         raise TypeError("Invalid type of persons. Must be digit (1-8).")
 
-    if not 0 < valid_persons < 9:
+    # if not 0 < valid_persons < 9:
+    # if valid_persons<1 or valid_persons>9:
+    if valid_persons not in range(1, 9):
         raise argparse.ArgumentTypeError("Invalid persons number. "
                                          "Max persons number: 8")
 
     return valid_persons
 
 
-def write_flight_information(meta_flight_info: typing.List[str],
-                             price_and_extra_info: typing.List[str],
-                             persons: int) -> typing.Dict[str, str]:
+def write_flight_information(meta_flight_info, price_and_extra_info, persons):
     """Parse flight information.
 
     Arguments:
@@ -335,14 +358,17 @@ def write_flight_information(meta_flight_info: typing.List[str],
     """
 
     # price_and_extra_info[0] contains extra "Price: " and "EUR"
+    # Price without currency and label is in the middle
     total_cost = int(price_and_extra_info[0][7:-7]) * persons
     flight_duration = calculate_flight_duration(*meta_flight_info[1:3])
     # flight_duration = calculate_flight_duration(meta_flight_info[1],
     #                                               meta_flight_info[2])
-    extra_info = price_and_extra_info[1]if len(
+
+    extra_info = price_and_extra_info[1] if len(
         price_and_extra_info) > 1 else ""
 
     # TODO: try namedtuple here
+    # namedtuple._fields to get keys from tuple
     return {
         "Date": meta_flight_info[0],
         "Departure": meta_flight_info[1],
