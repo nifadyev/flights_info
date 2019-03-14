@@ -343,10 +343,12 @@ class TestCreateUrlParameters(unittest.TestCase):
         )
 
         expected_args = {
+            "rt": None,
             "ow": "",
             "lang": "en",
             "depdate": "08.07.2019",
             "aptcode1": "BOJ",
+            "rtdate": None,
             "aptcode2": "BLL",
             "paxcount": 2
         }
@@ -366,6 +368,7 @@ class TestCreateUrlParameters(unittest.TestCase):
 
         expected_args = {
             "rt": "",
+            "ow": None,
             "lang": "en",
             "depdate": "18.07.2019",
             "aptcode1": "BOJ",
@@ -375,29 +378,6 @@ class TestCreateUrlParameters(unittest.TestCase):
         }
 
         self.assertEqual(source.create_url_parameters(args), expected_args)
-
-
-class TestWriteFlightInformation(unittest.TestCase):
-    def test_return_valid_flight_info(self):
-        args = (
-            "Wed, 24 Jul 19", "02:45", "06:25", "Copenhagen (CPH)",
-            "Burgas (BOJ)", "Price: 145.00 EUR", "", 3
-        )
-
-        expected_args = {
-            "Date": "Wed, 24 Jul 19",
-            "Departure": "02:45",
-            "Arrival": "06:25",
-            "Flight duration": "03:40",
-            "From": "Copenhagen (CPH)",
-            "To": "Burgas (BOJ)",
-            "Price": "435.00 EUR",
-            "Additional information": ""
-        }
-
-        self.assertEqual(
-            source.write_flight_information(*args), expected_args
-        )
 
 
 if __name__ == '__main__':
