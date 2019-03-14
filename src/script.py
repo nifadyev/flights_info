@@ -181,15 +181,13 @@ def find_flight_info(arguments):
                 and args.dest_city == dest_city:
             # Parsed_flight_info list structure: info about radio button, date,
             # departure time, arrival time, departure city, destination city
-            parsed_flight_info = [item.text for item in flight_info]
             flights_data["Outbound"] = write_flight_information(
-                *parsed_flight_info[1:], flight_id, table, args.passengers
+                *flight_info[1:], flight_id, table, args.passengers
             )
         elif flight_date == args.return_date and args.dep_city in dest_city\
                 and args.dest_city in dep_city:
-            parsed_flight_info = [item.text for item in flight_info]
             flights_data["Inbound"] = write_flight_information(
-                *parsed_flight_info[1:], flight_id, table, args.passengers
+                *flight_info[1:], flight_id, table, args.passengers
             )
 
     return flights_data
@@ -348,11 +346,11 @@ def write_flight_information(
 ):
     """Parse flight information.
     Arguments:
-        date {str} -- flight date.
-        dep_time {str} -- departure time.
-        arr_time {str} -- arrival time.
-        dep_city {str} -- full departure city name and its IATA code.
-        dest_city {str} -- full destination city name and its IATA code.
+        date {HtmlElement} -- flight date.
+        dep_time {HtmlElement} -- departure time.
+        arr_time {HtmlElement} -- arrival time.
+        dep_city {HtmlElement} -- full departure city name and IATA code.
+        dest_city {HtmlElement} -- full destination city name and IATA code.
         flight_id {str} -- ID of current flight.
         table {HtmlElement} -- table with full information about flights.
         passengers {int} -- total number passengers.
@@ -371,16 +369,16 @@ def write_flight_information(
     # price_and_extra_info[0] contains extra "Price: " and "EUR"
     total_cost = int(price[7:-7]) * passengers
     flight_duration = calculate_flight_duration(
-        dep_time, arr_time
+        dep_time.text, arr_time.text
     )
 
     return {
-        "Date": date,
-        "Departure": dep_time,
-        "Arrival": arr_time,
+        "Date": date.text,
+        "Departure": dep_time.text,
+        "Arrival": arr_time.text,
         "Flight duration": flight_duration,
-        "From": dep_city,
-        "To": dest_city,
+        "From": dep_city.text,
+        "To": dest_city.text,
         "Price": f"{total_cost}.00 EUR",
         "Additional information": extra_info
     }
