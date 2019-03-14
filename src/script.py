@@ -79,6 +79,36 @@ def check_route(dep_city, dest_city, flight_date):
         raise KeyError(message + ", ".join(DATES[current_route]))
 
 
+def create_url_parameters(args):
+    """Create parameters for making get request.
+
+    Arguments:
+        args {argparse.Namespace} -- flight parameters.
+
+    Returns:
+        dict -- valid url parameters.
+    """
+
+    parameters = {
+        "rt": None,
+        "ow": None,
+        "lang": "en",
+        "depdate": args.dep_date.strftime("%d.%m.%Y"),
+        "aptcode1": args.dep_city,
+        "rtdate": None,
+        "aptcode2": args.dest_city,
+        "paxcount": args.passengers
+    }
+
+    if args.return_date is not None:
+        parameters["rt"] = ""
+        parameters["rtdate"] = args.return_date.strftime("%d.%m.%Y")
+    else:
+        parameters["ow"] = ""
+
+    return parameters
+
+
 def find_flight_info(arguments):
     """Handle arguments and search for available flights on flybulgarien.dk.
 
@@ -149,36 +179,15 @@ def find_flight_info(arguments):
 
         if flight_date == args.dep_date and args.dep_city == dep_city\
                 and args.dest_city == dest_city:
-            parsed_flight_info = [item.text for item in flight_info]
-            price_and_extra_info = table.xpath(
-                f"./tr[contains(@id,'{flight_id}')"
-                "and not(contains(@id, 'rinf'))]/td[text()]"
-            )
-            price = price_and_extra_info[0].text
-            extra_info = price_and_extra_info[1].text\
-                if len(price_and_extra_info) > 1 else ""
-
             # Parsed_flight_info list structure: info about radio button, date,
             # departure time, arrival time, departure city, destination city
             flights_data["Outbound"] = write_flight_information(
-                *parsed_flight_info[1:], price, extra_info,
-                args.passengers
+                *flight_info[1:], flight_id, table, args.passengers
             )
-
         elif flight_date == args.return_date and args.dep_city in dest_city\
                 and args.dest_city in dep_city:
-            parsed_flight_info = [item.text for item in flight_info]
-            price_and_extra_info = table.xpath(
-                f"./tr[contains(@id,'{flight_id}')"
-                "and not(contains(@id, 'rinf'))]/td[text()]"
-            )
-            price = price_and_extra_info[0].text
-            extra_info = price_and_extra_info[1].text\
-                if len(price_and_extra_info) > 1 else ""
-
             flights_data["Inbound"] = write_flight_information(
-                *parsed_flight_info[1:], price, extra_info,
-                args.passengers
+                *flight_info[1:], flight_id, table, args.passengers
             )
 
     return flights_data
@@ -230,38 +239,6 @@ def parse_arguments(args):
     except BaseException:
         print(sys.exc_info()[1])
         sys.exit()
-
-
-def create_url_parameters(args):
-    """Create parameters for making get request.
-
-    Arguments:
-        args {argparse.Namespace} -- flight parameters.
-
-    Returns:
-        dict -- valid url parameters.
-    """
-
-    # Keys order is important
-    if args.return_date is not None:
-        return {
-            "rt": "",
-            "lang": "en",
-            "depdate": args.dep_date.strftime("%d.%m.%Y"),
-            "aptcode1": args.dep_city,
-            "rtdate": args.return_date.strftime("%d.%m.%Y"),
-            "aptcode2": args.dest_city,
-            "paxcount": args.passengers
-        }
-
-    return {
-        "ow": "",
-        "lang": "en",
-        "depdate": args.dep_date.strftime("%d.%m.%Y"),
-        "aptcode1": args.dep_city,
-        "aptcode2": args.dest_city,
-        "paxcount": args.passengers
-    }
 
 
 def print_flights_information(flights_info):
@@ -355,7 +332,7 @@ def validate_passengers(passengers):
     except ValueError:
         raise TypeError("Invalid type of passengers. Must be digit (1-8).")
 
-    if valid_passengers < 1 or valid_passengers > 9:
+    if valid_passengers < 1 or valid_passengers > 8:
         raise argparse.ArgumentTypeError(
             "Invalid passengers number. Max passengers number: 8"
         )
@@ -364,36 +341,44 @@ def validate_passengers(passengers):
 
 
 def write_flight_information(
-        date, dep_time, arr_time, dep_city, dest_city, price, extra_info,
+        date, dep_time, arr_time, dep_city, dest_city, flight_id, table,
         passengers
 ):
     """Parse flight information.
-
     Arguments:
-        date {str} -- flight date.
-        dep_time {str} -- departure time.
-        arr_time {str} -- arrival time.
-        dep_city {str} -- full departure city name and its IATA code.
-        dest_city {str} -- full destination city name and its IATA code.
-        price {str} -- cost of flight per person.
-        extra_info {str} -- additional information about flight.
+        date {HtmlElement} -- flight date.
+        dep_time {HtmlElement} -- departure time.
+        arr_time {HtmlElement} -- arrival time.
+        dep_city {HtmlElement} -- full departure city name and IATA code.
+        dest_city {HtmlElement} -- full destination city name and IATA code.
+        flight_id {str} -- ID of current flight.
+        table {HtmlElement} -- table with full information about flights.
         passengers {int} -- total number passengers.
-
     Returns:
         dict -- parsed flight information.
     """
 
+    price_and_extra_info = table.xpath(
+        f"./tr[contains(@id,'{flight_id}')"
+        "and not(contains(@id, 'rinf'))]/td[text()]"
+    )
+    price = price_and_extra_info[0].text
+    extra_info = price_and_extra_info[1].text\
+        if len(price_and_extra_info) > 1 else ""
+
     # price_and_extra_info[0] contains extra "Price: " and "EUR"
     total_cost = int(price[7:-7]) * passengers
-    flight_duration = calculate_flight_duration(dep_time, arr_time)
+    flight_duration = calculate_flight_duration(
+        dep_time.text, arr_time.text
+    )
 
     return {
-        "Date": date,
-        "Departure": dep_time,
-        "Arrival": arr_time,
+        "Date": date.text,
+        "Departure": dep_time.text,
+        "Arrival": arr_time.text,
         "Flight duration": flight_duration,
-        "From": dep_city,
-        "To": dest_city,
+        "From": dep_city.text,
+        "To": dest_city.text,
         "Price": f"{total_cost}.00 EUR",
         "Additional information": extra_info
     }
