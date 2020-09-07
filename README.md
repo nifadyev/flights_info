@@ -1,8 +1,10 @@
 # Flights informer
 
+![](https://img.shields.io/badge/python-v3.8-blue) ![](https://img.shields.io/badge/license-MIT-green)
+
 Command line application for searching available flights from flybulgarien.dk
 
-## Flights informer command line arguments
+## Command line arguments
 
 ```
 usage: main.py [-h] [-return_date RETURN_DATE] [-v]
